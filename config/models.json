@@ -1,0 +1,218 @@
+{
+  "models": [
+    {
+      "id": "deepseek-chat",
+      "provider": "deepseek",
+      "apiModelId": "deepseek-chat",
+      "capabilities": {
+        "maxInputTokens": 65536,
+        "maxOutputTokens": 8192,
+        "vision": false,
+        "toolUse": true,
+        "streaming": true
+      },
+      "cost": { "inputPer1M": 0.27, "outputPer1M": 1.10 },
+      "profile": {
+        "complexity": "medium",
+        "taskTypes": ["chat", "coding", "analysis"],
+        "strengths": ["fast", "cheap", "coding"],
+        "costTier": "budget"
+      }
+    },
+    {
+      "id": "deepseek-reasoner",
+      "provider": "deepseek",
+      "apiModelId": "deepseek-reasoner",
+      "capabilities": {
+        "maxInputTokens": 65536,
+        "maxOutputTokens": 8192,
+        "vision": false,
+        "toolUse": false,
+        "streaming": true
+      },
+      "cost": { "inputPer1M": 0.55, "outputPer1M": 2.19 },
+      "profile": {
+        "complexity": "high",
+        "taskTypes": ["analysis", "coding"],
+        "strengths": ["reasoning", "math", "analysis"],
+        "costTier": "budget"
+      }
+    },
+    {
+      "id": "deepseek-v4-pro",
+      "provider": "deepseek",
+      "apiModelId": "deepseek-v4-pro",
+      "capabilities": {
+        "maxInputTokens": 262144,
+        "maxOutputTokens": 32768,
+        "vision": true,
+        "toolUse": true,
+        "streaming": true
+      },
+      "cost": { "inputPer1M": 0.53, "outputPer1M": 2.19 },
+      "profile": {
+        "complexity": "high",
+        "taskTypes": ["coding", "analysis", "agentic", "creative", "chat"],
+        "strengths": ["reasoning", "coding", "analysis", "tool-use", "vision"],
+        "costTier": "standard"
+      }
+    },
+    {
+      "id": "deepseek-v4-flash",
+      "provider": "deepseek",
+      "apiModelId": "deepseek-v4-flash",
+      "capabilities": {
+        "maxInputTokens": 131072,
+        "maxOutputTokens": 16384,
+        "vision": true,
+        "toolUse": true,
+        "streaming": true
+      },
+      "cost": { "inputPer1M": 0.14, "outputPer1M": 0.28 },
+      "profile": {
+        "complexity": "low",
+        "taskTypes": ["chat", "coding", "analysis", "summarization", "extraction"],
+        "strengths": ["fast", "cheap", "coding", "vision"],
+        "costTier": "budget"
+      }
+    },
+    {
+      "id": "claude-haiku-4-5",
+      "provider": "anthropic",
+      "apiModelId": "claude-haiku-4-5-20251001",
+      "capabilities": {
+        "maxInputTokens": 200000,
+        "maxOutputTokens": 8192,
+        "vision": true,
+        "toolUse": true,
+        "streaming": true
+      },
+      "cost": { "inputPer1M": 1.0, "outputPer1M": 5.0 },
+      "profile": {
+        "complexity": "low",
+        "taskTypes": ["chat", "coding", "analysis", "creative", "summarization", "extraction"],
+        "strengths": ["fast", "cheap", "tool-use"],
+        "costTier": "low"
+      }
+    },
+    {
+      "id": "claude-sonnet-5",
+      "provider": "anthropic",
+      "apiModelId": "claude-sonnet-5",
+      "capabilities": {
+        "maxInputTokens": 200000,
+        "maxOutputTokens": 16384,
+        "vision": true,
+        "toolUse": true,
+        "streaming": true
+      },
+      "cost": { "inputPer1M": 3.0, "outputPer1M": 15.0 },
+      "profile": {
+        "complexity": "high",
+        "taskTypes": ["coding", "analysis", "agentic", "creative"],
+        "strengths": ["reasoning", "coding", "tool-use", "analysis"],
+        "costTier": "standard"
+      }
+    },
+    {
+      "id": "claude-opus-4-8",
+      "provider": "anthropic",
+      "apiModelId": "claude-opus-4-8",
+      "capabilities": {
+        "maxInputTokens": 200000,
+        "maxOutputTokens": 32768,
+        "vision": true,
+        "toolUse": true,
+        "streaming": true
+      },
+      "cost": { "inputPer1M": 15.0, "outputPer1M": 75.0 },
+      "profile": {
+        "complexity": "high",
+        "taskTypes": ["coding", "analysis", "agentic", "creative"],
+        "strengths": ["reasoning", "coding", "tool-use", "analysis", "safety"],
+        "costTier": "premium"
+      }
+    },
+    {
+      "id": "gpt-4o-mini",
+      "provider": "openai",
+      "apiModelId": "gpt-4o-mini",
+      "capabilities": {
+        "maxInputTokens": 128000,
+        "maxOutputTokens": 16384,
+        "vision": true,
+        "toolUse": true,
+        "streaming": true
+      },
+      "cost": { "inputPer1M": 0.15, "outputPer1M": 0.60 },
+      "profile": {
+        "complexity": "low",
+        "taskTypes": ["chat", "coding", "analysis", "summarization", "extraction"],
+        "strengths": ["fast", "cheap"],
+        "costTier": "budget"
+      }
+    },
+    {
+      "id": "gpt-4o",
+      "provider": "openai",
+      "apiModelId": "gpt-4o",
+      "capabilities": {
+        "maxInputTokens": 128000,
+        "maxOutputTokens": 16384,
+        "vision": true,
+        "toolUse": true,
+        "streaming": true
+      },
+      "cost": { "inputPer1M": 2.50, "outputPer1M": 10.0 },
+      "profile": {
+        "complexity": "high",
+        "taskTypes": ["coding", "analysis", "agentic", "creative"],
+        "strengths": ["reasoning", "coding", "tool-use", "multimodal"],
+        "costTier": "standard"
+      }
+    },
+    {
+      "id": "gemini-2.5-flash",
+      "provider": "gemini",
+      "apiModelId": "gemini-2.5-flash",
+      "capabilities": {
+        "maxInputTokens": 1048576,
+        "maxOutputTokens": 8192,
+        "vision": true,
+        "toolUse": true,
+        "streaming": true
+      },
+      "cost": { "inputPer1M": 0.15, "outputPer1M": 0.60 },
+      "profile": {
+        "complexity": "low",
+        "taskTypes": ["chat", "summarization", "extraction", "analysis"],
+        "strengths": ["fast", "cheap", "large-context"],
+        "costTier": "budget"
+      }
+    },
+    {
+      "id": "gemini-2.5-pro",
+      "provider": "gemini",
+      "apiModelId": "gemini-2.5-pro",
+      "capabilities": {
+        "maxInputTokens": 1048576,
+        "maxOutputTokens": 16384,
+        "vision": true,
+        "toolUse": true,
+        "streaming": true
+      },
+      "cost": { "inputPer1M": 1.25, "outputPer1M": 10.0 },
+      "profile": {
+        "complexity": "high",
+        "taskTypes": ["analysis", "coding", "summarization"],
+        "strengths": ["reasoning", "large-context", "analysis"],
+        "costTier": "standard"
+      }
+    }
+  ],
+  "defaults": {
+    "model": "deepseek-chat",
+    "maxTokens": 4096,
+    "temperature": 1
+  }
+}

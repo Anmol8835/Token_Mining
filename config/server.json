@@ -1,0 +1,14 @@
+{
+  "classifier": {
+    "mode": "auto",
+    "ruleConfidenceThreshold": 2.0,
+    "llmClassifierModel": "deepseek-v4-flash",
+    "cacheHours": 1
+  },
+  "router": {
+    "costWeight": 0.3,
+    "qualityWeight": 0.7,
+    "fallbackModel": "deepseek-v4-flash",
+    "providerFallbackChain": ["deepseek-v4-flash", "deepseek-chat", "deepseek-reasoner", "deepseek-v4-pro"]
+  }
+}
