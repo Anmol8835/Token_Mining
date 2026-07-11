@@ -1,6 +1,8 @@
-import json
 import re
 from typing import Optional
+
+if False:
+    from src.redact.ner import NERRedactor  # noqa: F401 — type-check only
 
 DEFAULT_REDACT_TERMS = ["acme corp", "john smith", "jane doe"]
 
@@ -19,7 +21,9 @@ VERSION_NUM = re.compile(r"\bv?\d+\.\d+\.\d+\b")
 class RedactionLayer:
     def __init__(self, redact_terms: Optional[list[str]] = None):
         self._terms = redact_terms or list(DEFAULT_REDACT_TERMS)
-        self._placeholders: dict[str, str] = {}
+        self._placeholders: dict[str, str] = {
+            f"[REDACTED_{i}]": term for i, term in enumerate(self._terms)
+        }
         self._request_placeholders: dict[str, str] = {}
         self._ner: Optional["NERRedactor"] = None
 
@@ -40,8 +44,9 @@ class RedactionLayer:
             placeholder = f"[REDACTED_{i}]"
             self._placeholders[placeholder] = term
             flags = re.IGNORECASE
+            pattern = r"(?<!\w)" + re.escape(term) + r"(?!\w)"
             result = re.sub(
-                re.escape(term),
+                pattern,
                 lambda m: self._replace_case(placeholder, m.group(0)),
                 result,
                 flags=flags,
@@ -65,7 +70,8 @@ class RedactionLayer:
         def replacer(m: re.Match) -> str:
             matched = m.group(0)
             if VERSION_NUM.fullmatch(matched) or DATE_LIKE_PHONE.fullmatch(matched):
-                return matched
+                if placeholder != "[SSN]":
+                    return matched
             return placeholder
 
         return pattern.sub(replacer, text)
@@ -73,13 +79,12 @@ class RedactionLayer:
     def _replace_case(self, placeholder: str, original: str) -> str:
         if original.isupper():
             return placeholder.upper()
-        if original[0].isupper():
-            result = list(placeholder.lower())
-            for i, ch in enumerate(original):
-                if i < len(result) and ch.isupper() and result[i].islower():
-                    result[i] = result[i].upper()
-            return "".join(result)
-        return placeholder.lower()
+        if original.islower():
+            return placeholder.lower()
+        first_alpha = next((i for i, ch in enumerate(placeholder) if ch.isalpha()), 0)
+        placeholder_chars = list(placeholder.lower())
+        placeholder_chars[first_alpha] = placeholder_chars[first_alpha].upper()
+        return "".join(placeholder_chars)
 
     def redact_messages(self, messages: list[dict]) -> list[dict]:
         redacted = []
@@ -101,14 +106,35 @@ class RedactionLayer:
     def rehydrate(self, text: str) -> str:
         result = text
         for placeholder, original in sorted(self._placeholders.items(), key=lambda x: -len(x[0])):
-            result = result.replace(placeholder, original)
-            result = result.replace(placeholder.upper(), original.upper())
-            result = result.replace(placeholder.capitalize(), original.capitalize())
+            placeholder_escaped = re.escape(placeholder)
+            result = re.sub(
+                placeholder_escaped,
+                lambda m, orig=original: self._match_case(orig, m.group(0)),
+                result,
+                flags=re.IGNORECASE,
+            )
         for placeholder, original in sorted(
             self._request_placeholders.items(), key=lambda x: -len(x[0])
         ):
             result = result.replace(placeholder, original)
         return result
+
+    @staticmethod
+    def _match_case(target: str, case_template: str) -> str:
+        if case_template.isupper():
+            return target.upper()
+        if case_template.islower():
+            return target.lower()
+        first_alpha_tmpl = next((i for i, ch in enumerate(case_template) if ch.isalpha()), 0)
+        if first_alpha_tmpl < len(case_template) and case_template[first_alpha_tmpl].isupper():
+            return target[0].upper() + target[1:] if target else target
+        return target.lower()
+        first_alpha = next((i for i, ch in enumerate(case_template) if ch.isalpha()), 0)
+        if first_alpha < len(case_template) and case_template[first_alpha].isupper():
+            words = target.split()
+            titled = " ".join(w.capitalize() for w in words)
+            return titled
+        return target.lower()
 
     def rehydrate_response(self, content: str) -> str:
         return self.rehydrate(content)

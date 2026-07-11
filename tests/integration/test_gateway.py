@@ -9,7 +9,6 @@ from src.gateway.server import (
     cache,
     experience_memory,
     learning,
-    redactor,
     semantic_memory,
 )
 from src.memory.context import _count_messages_tokens
@@ -635,7 +634,6 @@ class TestRedaction:
 
     @pytest.mark.asyncio
     async def test_cache_hit_rehydrates_response(self, client):
-        redactor_instance = redactor
         payload = {
             "messages": [{"role": "user", "content": "ACME Corp test for cache rehydration"}],
             "temperature": 0.0,

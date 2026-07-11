@@ -1,0 +1,12 @@
+[
+  {"text": "Contact me at john.doe@example.com", "expected_masks": ["[EMAIL]"], "labels": ["EMAIL"]},
+  {"text": "Call (555) 123-4567 for support", "expected_masks": ["[PHONE]"], "labels": ["PHONE"]},
+  {"text": "SSN: 123-45-6789", "expected_masks": ["[SSN]"], "labels": ["SSN"]},
+  {"text": "Card: 4111 1111 1111 1111", "expected_masks": ["[CC]"], "labels": ["CC"]},
+  {"text": "Server at 192.168.1.1", "expected_masks": ["[IP]"], "labels": ["IP"]},
+  {"text": "ACME Corp is our partner", "expected_masks": ["[REDACTED_0]"], "labels": ["REDACTED"]},
+  {"text": "My email is alice@acme.com and phone is 555-111-2222", "expected_masks": ["[EMAIL]", "[PHONE]"], "labels": ["EMAIL", "PHONE"]},
+  {"text": "Version 1.2.3 of the software", "expected_masks": [], "labels": []},
+  {"text": "Date: 2024-01-15", "expected_masks": [], "labels": []},
+  {"text": "A completely safe message without any PII", "expected_masks": [], "labels": []}
+]

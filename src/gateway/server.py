@@ -131,12 +131,6 @@ async def chat_completion(body: ChatCompletionRequest):
     redactor.clear_request_placeholders()
     redacted_messages = redactor.redact_messages(body.messages)
 
-    last_user_msg = ""
-    for m in body.messages[::-1]:
-        if m.get("role") == "user":
-            last_user_msg = m.get("content", "")
-            break
-
     last_user_msg_redacted = ""
     for m in redacted_messages[::-1]:
         if m.get("role") == "user":
