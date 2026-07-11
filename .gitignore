@@ -5,3 +5,4 @@ bench/results/
 *.db
 dist/
 *.egg-info/
+.venv/
