@@ -1,0 +1,82 @@
+{
+  "memories": [
+    {
+      "id": "mem-1",
+      "text": "The ACOS gateway uses FastAPI framework with SQLAlchemy for database operations and SQLite for local storage."
+    },
+    {
+      "id": "mem-2",
+      "text": "API keys are configured through environment variables prefixed with ACOS_ such as ACOS_PREMIUM_API_KEY and ACOS_CHEAP_API_KEY."
+    },
+    {
+      "id": "mem-3",
+      "text": "The exact cache stores LLM responses keyed by SHA-256 hash of the normalized prompt and supports configurable TTL."
+    },
+    {
+      "id": "mem-4",
+      "text": "The rule router classifies requests into cheap or premium categories using keyword matching and regex patterns."
+    },
+    {
+      "id": "mem-5",
+      "text": "The rolling context summarizer caps conversation history at 800 tokens using simulated or LLM-based summarization."
+    }
+  ],
+  "queries": [
+    {
+      "query": "What web framework does the gateway use?",
+      "expected_id": "mem-1",
+      "should_match": true
+    },
+    {
+      "query": "How is the database accessed in the ACOS gateway?",
+      "expected_id": "mem-1",
+      "should_match": true
+    },
+    {
+      "query": "How do I set API keys for the system?",
+      "expected_id": "mem-2",
+      "should_match": true
+    },
+    {
+      "query": "What environment variables configure the API keys?",
+      "expected_id": "mem-2",
+      "should_match": true
+    },
+    {
+      "query": "How are cached responses stored and retrieved?",
+      "expected_id": "mem-3",
+      "should_match": true
+    },
+    {
+      "query": "Explain how the cache key is generated from prompts",
+      "expected_id": "mem-3",
+      "should_match": true
+    },
+    {
+      "query": "How does the system decide between cheap and premium models?",
+      "expected_id": "mem-4",
+      "should_match": true
+    },
+    {
+      "query": "What classification strategies does the rule router use?",
+      "expected_id": "mem-4",
+      "should_match": true
+    },
+    {
+      "query": "How does the context summarizer manage the token budget?",
+      "expected_id": "mem-5",
+      "should_match": true
+    },
+    {
+      "query": "What limits the conversation history length in the system?",
+      "expected_id": "mem-5",
+      "should_match": true
+    }
+  ],
+  "negatives": [
+    "Tell me a joke about programming",
+    "What is the meaning of life?",
+    "Write a haiku about artificial intelligence",
+    "How do I bake a chocolate cake?"
+  ]
+}

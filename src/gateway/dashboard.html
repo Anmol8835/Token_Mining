@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ACOS Dashboard</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0f172a; color: #e2e8f0; padding: 24px; }
+h1 { font-size: 24px; margin-bottom: 4px; color: #38bdf8; }
+.subtitle { color: #94a3b8; font-size: 14px; margin-bottom: 24px; }
+.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; margin-bottom: 24px; }
+.card { background: #1e293b; border-radius: 12px; padding: 20px; border: 1px solid #334155; }
+.card h3 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px; color: #94a3b8; margin-bottom: 8px; }
+.card .value { font-size: 28px; font-weight: 700; color: #f8fafc; }
+.card .delta { font-size: 13px; margin-top: 4px; }
+.positive { color: #4ade80; }
+.negative { color: #f87171; }
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+th { text-align: left; padding: 10px 12px; border-bottom: 1px solid #334155; color: #94a3b8; text-transform: uppercase; font-size: 11px; letter-spacing: 0.5px; }
+td { padding: 10px 12px; border-bottom: 1px solid #1e293b; }
+tr:hover td { background: #1e293b; }
+.badge { display: inline-block; padding: 2px 8px; border-radius: 6px; font-size: 11px; font-weight: 600; }
+.badge-green { background: rgba(74,222,128,0.15); color: #4ade80; }
+.badge-blue { background: rgba(56,189,248,0.15); color: #38bdf8; }
+</style>
+</head>
+<body>
+<h1>ACOS Metrics Dashboard</h1>
+<p class="subtitle">Live metrics vs Phase 0 naive baseline &mdash; <span id="update-time"></span></p>
+<div id="summary-cards" class="grid"></div>
+<h2 style="margin-bottom:12px;font-size:16px;">Per-Phase Breakdown</h2>
+<table><thead><tr>
+<th>Phase</th><th>Requests</th><th>Mean Latency</th>
+<th>Total Tokens</th><th>Total Cost</th>
+<th>Cache Hit Rate</th><th>Premium</th><th>Cheap</th>
+</tr></thead><tbody id="phases-body"></tbody></table>
+<script>
+async function refresh() {
+  document.getElementById('update-time').textContent =
+    'Updated ' + new Date().toLocaleTimeString();
+  try {
+    const r = await fetch('/metrics');
+    const d = await r.json();
+    const cards = document.getElementById('summary-cards');
+    cards.innerHTML = '';
+    const latest = d.latest || {};
+    const impr = d.improvements || {};
+    function card(title, value, delta) {
+      var cls = delta && delta.startsWith('+') ? 'negative' : 'positive';
+      var dHtml = delta ? '<div class="delta ' + cls + '">' + delta + '</div>' : '';
+      return '<div class="card"><h3>' + title + '</h3><div class="value">'
+        + value + '</div>' + dHtml + '</div>';
+    }
+    cards.innerHTML += card('Requests', latest.requests || 0, '');
+    cards.innerHTML += card('Avg Latency',
+      (latest.mean_latency_ms || 0) + ' ms', '');
+    cards.innerHTML += card('Total Tokens',
+      (latest.total_tokens || 0).toLocaleString(),
+      impr.token_reduction_pct !== undefined
+        ? '-' + impr.token_reduction_pct + '% vs baseline' : '');
+    cards.innerHTML += card('Total Cost',
+      '$' + (latest.total_cost_usd || 0).toFixed(6),
+      impr.cost_reduction_pct !== undefined
+        ? '-' + impr.cost_reduction_pct + '% vs baseline' : '');
+    cards.innerHTML += card('Cache Hit Rate',
+      (latest.cache_hit_rate_pct || 0) + '%', '');
+    cards.innerHTML += card('Premium Reduction',
+      impr.premium_reduction_pct != null
+        ? impr.premium_reduction_pct + '%' : 'n/a', '');
+    cards.innerHTML += card('Premium Calls', latest.premium_calls || 0, '');
+    cards.innerHTML += card('Cheap Calls', latest.cheap_calls || 0, '');
+    var tbody = document.getElementById('phases-body');
+    tbody.innerHTML = '';
+    (d.phases ? Object.entries(d.phases) : []).forEach(function(x) {
+      var name = x[0], p = x[1];
+      var tr = document.createElement('tr');
+      var badge = name === 'phase0-baseline' ? 'badge-green' : 'badge-blue';
+      tr.innerHTML = '<td><span class="badge ' + badge + '">' + name
+        + '</span></td><td>' + p.requests + '</td><td>'
+        + p.mean_latency_ms + ' ms</td><td>'
+        + (p.total_tokens || 0).toLocaleString() + '</td><td>$'
+        + (p.total_cost_usd || 0).toFixed(6) + '</td><td>'
+        + (p.cache_hit_rate || 0) + '%</td><td>'
+        + (p.premium_calls || 0) + '</td><td>'
+        + (p.cheap_calls || 0) + '</td>';
+      tbody.appendChild(tr);
+    });
+  } catch(e) {
+    document.getElementById('summary-cards').innerHTML =
+      '<div class="card"><h3>Error</h3><div class="value">'
+      + e.message + '</div></div>';
+  }
+}
+refresh();
+setInterval(refresh, 5000);
+</script>
+</body>
+</html>

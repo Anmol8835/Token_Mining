@@ -1,0 +1,102 @@
+[
+  {
+    "id": "greeting-1",
+    "messages": [{"role": "user", "content": "Hello! How are you today?"}],
+    "category": "simple"
+  },
+  {
+    "id": "greeting-2",
+    "messages": [{"role": "user", "content": "Hi there! Can you help me with something?"}],
+    "category": "simple"
+  },
+  {
+    "id": "greeting-1-repeat",
+    "messages": [{"role": "user", "content": "Hello! How are you today?"}],
+    "category": "simple"
+  },
+  {
+    "id": "code-python-sort",
+    "messages": [{"role": "user", "content": "Write a Python function that sorts a list of dictionaries by a given key using a stable sort."}],
+    "category": "code"
+  },
+  {
+    "id": "code-js-fetch",
+    "messages": [{"role": "user", "content": "Write a JavaScript function that fetches data from an API with retry logic and exponential backoff."}],
+    "category": "code"
+  },
+  {
+    "id": "code-python-sort-repeat",
+    "messages": [{"role": "user", "content": "Write a Python function that sorts a list of dictionaries by a given key using a stable sort."}],
+    "category": "code"
+  },
+  {
+    "id": "analysis-sentiment",
+    "messages": [{"role": "user", "content": "Analyze the sentiment of this customer review: 'The product arrived late and was damaged. Very disappointed with the quality.' Give me a sentiment score from -1 to 1 and explain why."}],
+    "category": "analysis"
+  },
+  {
+    "id": "analysis-summarize",
+    "messages": [{"role": "user", "content": "Summarize this article in 3 bullet points: 'Scientists have discovered a new species of deep-sea fish that can change its color to match the ocean floor. The fish, named Chromatus adaptis, uses specialized cells called chromatophores to blend in with its surroundings. Researchers believe this adaptation helps it avoid predators in the dark depths where bioluminescence is common.'"}],
+    "category": "analysis"
+  },
+  {
+    "id": "analysis-sentiment-repeat",
+    "messages": [{"role": "user", "content": "Analyze the sentiment of this customer review: 'The product arrived late and was damaged. Very disappointed with the quality.' Give me a sentiment score from -1 to 1 and explain why."}],
+    "category": "analysis"
+  },
+  {
+    "id": "creative-story",
+    "messages": [{"role": "user", "content": "Write a 2-sentence story about a robot that learns to paint."}],
+    "category": "creative"
+  },
+  {
+    "id": "factual-q-wikipedia",
+    "messages": [{"role": "user", "content": "What is the capital of Mongolia and what is its population?"}],
+    "category": "factual"
+  },
+  {
+    "id": "math-equation",
+    "messages": [{"role": "user", "content": "Solve for x: 3x^2 + 12x - 15 = 0. Show your steps."}],
+    "category": "math"
+  },
+  {
+    "id": "math-equation-repeat",
+    "messages": [{"role": "user", "content": "Solve for x: 3x^2 + 12x - 15 = 0. Show your steps."}],
+    "category": "math"
+  },
+  {
+    "id": "code-refactor",
+    "messages": [{"role": "user", "content": "Refactor this Python code to be more idiomatic and efficient:\n\ndef process_data(items):\n    result = []\n    for i in range(len(items)):\n        item = items[i]\n        if item['active'] == True:\n            calc = item['value'] * 2 + 10\n            result.append({'name': item['name'], 'computed': calc})\n    return result"}],
+    "category": "code"
+  },
+  {
+    "id": "creative-poem",
+    "messages": [{"role": "user", "content": "Write a haiku about a computer debugging at midnight."}],
+    "category": "creative"
+  },
+  {
+    "id": "factual-q-repeat",
+    "messages": [{"role": "user", "content": "What is the capital of Mongolia and what is its population?"}],
+    "category": "factual"
+  },
+  {
+    "id": "creative-story-repeat",
+    "messages": [{"role": "user", "content": "Write a 2-sentence story about a robot that learns to paint."}],
+    "category": "creative"
+  },
+  {
+    "id": "code-explain",
+    "messages": [{"role": "user", "content": "Explain how a binary search tree works and when you would use it instead of a hash table."}],
+    "category": "code"
+  },
+  {
+    "id": "analysis-compare",
+    "messages": [{"role": "user", "content": "Compare and contrast REST and GraphQL APIs. When would you choose one over the other?"}],
+    "category": "analysis"
+  },
+  {
+    "id": "novel-prompt-1",
+    "messages": [{"role": "user", "content": "Design a database schema for a multi-tenant SaaS application that supports custom fields per tenant. Explain your normalization decisions."}],
+    "category": "analysis"
+  }
+]

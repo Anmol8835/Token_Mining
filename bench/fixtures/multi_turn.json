@@ -1,0 +1,266 @@
+[
+  {
+    "id": "mt-01",
+    "messages": [
+      {"role": "system", "content": "You are a helpful assistant."},
+      {"role": "user", "content": "Hi there! I need help with my Python project."}
+    ]
+  },
+  {
+    "id": "mt-02",
+    "messages": [
+      {"role": "system", "content": "You are a helpful assistant."},
+      {"role": "user", "content": "Hi there! I need help with my Python project."},
+      {"role": "assistant", "content": "Sure! What are you building? I can help with architecture, debugging, or code review."},
+      {"role": "user", "content": "I'm building a REST API with FastAPI for a task manager app."}
+    ]
+  },
+  {
+    "id": "mt-03",
+    "messages": [
+      {"role": "system", "content": "You are a helpful assistant."},
+      {"role": "user", "content": "Hi! I need Python project help."},
+      {"role": "assistant", "content": "Sure, what are you building?"},
+      {"role": "user", "content": "A FastAPI REST API for task management."},
+      {"role": "assistant", "content": "Great choice! FastAPI is excellent for REST APIs. I recommend organizing your code into routers, services, and repositories."},
+      {"role": "user", "content": "What database should I use? SQLite or PostgreSQL?"}
+    ]
+  },
+  {
+    "id": "mt-04",
+    "messages": [
+      {"role": "system", "content": "You are a helpful assistant."},
+      {"role": "user", "content": "I need Python project help."},
+      {"role": "assistant", "content": "What are you building?"},
+      {"role": "user", "content": "FastAPI task manager REST API."},
+      {"role": "assistant", "content": "Great choice! Use routers, services, repositories pattern."},
+      {"role": "user", "content": "Which DB should I use?"},
+      {"role": "assistant", "content": "SQLite for development since it needs zero setup. For production, switch to PostgreSQL. Use SQLAlchemy as your ORM so the switch is painless."},
+      {"role": "user", "content": "Good advice. Should I use async SQLAlchemy or sync?"}
+    ]
+  },
+  {
+    "id": "mt-05",
+    "messages": [
+      {"role": "system", "content": "You are a helpful assistant."},
+      {"role": "user", "content": "I need Python project advice."},
+      {"role": "assistant", "content": "What are you building?"},
+      {"role": "user", "content": "FastAPI task manager API."},
+      {"role": "assistant", "content": "Use routers, services, repositories."},
+      {"role": "user", "content": "SQLite or PostgreSQL?"},
+      {"role": "assistant", "content": "SQLite for dev, PostgreSQL for prod with SQLAlchemy."},
+      {"role": "user", "content": "Async or sync SQLAlchemy?"},
+      {"role": "assistant", "content": "Use async SQLAlchemy with FastAPI since FastAPI is async-native. It avoids blocking the event loop during DB queries. Use asyncpg as the PostgreSQL driver for production."},
+      {"role": "user", "content": "Got it. Now for authentication, should I use JWT tokens?"}
+    ]
+  },
+  {
+    "id": "mt-06",
+    "messages": [
+      {"role": "system", "content": "You are a helpful assistant."},
+      {"role": "user", "content": "Help with my Python project."},
+      {"role": "assistant", "content": "What are you building exactly?"},
+      {"role": "user", "content": "FastAPI task manager with auth."},
+      {"role": "assistant", "content": "Use routers, services, repositories pattern."},
+      {"role": "user", "content": "SQLite or PostgreSQL?"},
+      {"role": "assistant", "content": "SQLite for dev, PostgreSQL for prod."},
+      {"role": "user", "content": "Async or sync SQLAlchemy?"},
+      {"role": "assistant", "content": "Async with asyncpg driver for production."},
+      {"role": "user", "content": "Should I use JWT tokens?"},
+      {"role": "assistant", "content": "Yes! JWT is the standard for stateless REST APIs. Use python-jose for JWT encoding/decoding and passlib with bcrypt for password hashing. Set short access tokens (15-30 min) with refresh tokens for longer sessions."},
+      {"role": "user", "content": "What about refresh token rotation for security?"}
+    ]
+  },
+  {
+    "id": "mt-07",
+    "messages": [
+      {"role": "system", "content": "You are a helpful assistant."},
+      {"role": "user", "content": "Python project help needed."},
+      {"role": "assistant", "content": "What are you building exactly?"},
+      {"role": "user", "content": "FastAPI task manager with JWT auth."},
+      {"role": "assistant", "content": "Use routers, services, repositories. SQLite dev, PostgreSQL prod."},
+      {"role": "user", "content": "Async SQLAlchemy?"},
+      {"role": "assistant", "content": "Yes, async SQLAlchemy with asyncpg."},
+      {"role": "user", "content": "JWT tokens approach?"},
+      {"role": "assistant", "content": "Use python-jose, short-lived access tokens, refresh tokens."},
+      {"role": "user", "content": "Refresh token rotation?"},
+      {"role": "assistant", "content": "Yes, rotate refresh tokens on each use. When a refresh token is used, issue a new one and invalidate the old. This limits the damage if a refresh token is stolen. Store hashed refresh tokens in your database."},
+      {"role": "user", "content": "Great. Now I need to implement task CRUD operations. Should I use Pydantic schemas for request/response validation?"}
+    ]
+  },
+  {
+    "id": "mt-08",
+    "messages": [
+      {"role": "system", "content": "You are a helpful assistant."},
+      {"role": "user", "content": "Python project help."},
+      {"role": "assistant", "content": "What are you building?"},
+      {"role": "user", "content": "FastAPI task manager with JWT + refresh rotation."},
+      {"role": "assistant", "content": "Good stack. Use layered architecture."},
+      {"role": "user", "content": "Pydantic schemas for CRUD validation?"},
+      {"role": "assistant", "content": "Absolutely. Pydantic schemas are built into FastAPI. Create separate schemas for CreateTask, UpdateTask, and TaskResponse. Use response_model in your route decorators for automatic validation and OpenAPI docs."},
+      {"role": "user", "content": "How should I handle task statuses? I want todo, in-progress, review, done."}
+    ]
+  },
+  {
+    "id": "mt-09",
+    "messages": [
+      {"role": "system", "content": "You are a helpful assistant."},
+      {"role": "user", "content": "I need Python project architecture advice."},
+      {"role": "assistant", "content": "What are you building?"},
+      {"role": "user", "content": "FastAPI task manager with CRUD and status tracking."},
+      {"role": "assistant", "content": "Solid plan. Use Pydantic schemas for validation."},
+      {"role": "user", "content": "Task statuses: enum or separate table?"},
+      {"role": "assistant", "content": "Use a Python Enum for fixed statuses like todo, in-progress, review, done since they change rarely. For audit purposes, create a task_status_log table that records each transition with timestamps."},
+      {"role": "user", "content": "Should I add WebSocket support for real-time task updates?"}
+    ]
+  },
+  {
+    "id": "mt-10",
+    "messages": [
+      {"role": "system", "content": "You are a helpful assistant."},
+      {"role": "user", "content": "Python project architecture question."},
+      {"role": "assistant", "content": "What's your use case?"},
+      {"role": "user", "content": "FastAPI task manager with status history tracking."},
+      {"role": "assistant", "content": "Use enum for statuses, log table for history."},
+      {"role": "user", "content": "Should I add WebSocket support?"},
+      {"role": "assistant", "content": "Yes, WebSockets are great for real-time updates. FastAPI has built-in WebSocket support. Use a connection manager to track active connections and broadcast task status changes to relevant users. This gives a responsive UI experience."},
+      {"role": "user", "content": "How do I handle file uploads for task attachments?"}
+    ]
+  },
+  {
+    "id": "mt-11",
+    "messages": [
+      {"role": "system", "content": "You are a helpful assistant."},
+      {"role": "user", "content": "Python API question about WebSockets."},
+      {"role": "assistant", "content": "FastAPI has native WebSocket support."},
+      {"role": "user", "content": "How do connections work with auth?"},
+      {"role": "assistant", "content": "Validate JWT token during WebSocket handshake in the accept/reject step."},
+      {"role": "user", "content": "What about broadcasting updates to specific users?"},
+      {"role": "assistant", "content": "Create a ConnectionManager class that tracks user connections in a dict. When a task updates, look up the affected user's connections and send the update to each one."},
+      {"role": "user", "content": "What about file uploads for task attachments?"},
+      {"role": "assistant", "content": "Use UploadFile and File from FastAPI. Store files on disk or S3 and save the path/URL in your database. Limit file size with middleware and validate file types on upload."},
+      {"role": "user", "content": "Should I use Celery for background tasks like sending notification emails?"}
+    ]
+  },
+  {
+    "id": "mt-12",
+    "messages": [
+      {"role": "system", "content": "You are a helpful assistant."},
+      {"role": "user", "content": "Need advice on background tasks in FastAPI."},
+      {"role": "assistant", "content": "FastAPI has BackgroundTasks for light tasks. For heavier workloads use Celery."},
+      {"role": "user", "content": "I need to send notification emails when tasks are created."},
+      {"role": "assistant", "content": "For email notifications, use BackgroundTasks from FastAPI if the email service is fast. If you have many users or complex workflows, use Celery with Redis as the broker."},
+      {"role": "user", "content": "What about testing my FastAPI app? Any recommendations?"},
+      {"role": "assistant", "content": "Use pytest with pytest-asyncio for async tests. Use TestClient from Starlette for integration tests. Mock external services like email and file storage. Use a test database that gets created and destroyed per test session."},
+      {"role": "user", "content": "How do I handle environment-specific configuration?"}
+    ]
+  },
+  {
+    "id": "mt-13",
+    "messages": [
+      {"role": "system", "content": "You are a helpful assistant."},
+      {"role": "user", "content": "Testing and configuration advice needed."},
+      {"role": "assistant", "content": "pytest + pytest-asyncio + TestClient is the standard FastAPI testing stack."},
+      {"role": "user", "content": "How do I handle environment-specific config in FastAPI?"},
+      {"role": "assistant", "content": "Use pydantic-settings for configuration management. Create a Settings class that reads from environment variables and .env files. Different environments use different .env files. This is clean and testable."},
+      {"role": "user", "content": "Should I use Docker for deployment?"},
+      {"role": "assistant", "content": "Yes! Docker provides consistency across environments. Use a multi-stage Dockerfile to keep the final image small. Use docker-compose for local development with your database and Redis services."},
+      {"role": "user", "content": "What about CI/CD pipelines for automated testing and deployment?"}
+    ]
+  },
+  {
+    "id": "mt-14",
+    "messages": [
+      {"role": "system", "content": "You are a helpful assistant."},
+      {"role": "user", "content": "Docker and CI/CD questions."},
+      {"role": "assistant", "content": "Docker gives consistent environments. Multi-stage builds keep images small."},
+      {"role": "user", "content": "CI/CD pipeline recommendations?"},
+      {"role": "assistant", "content": "Use GitHub Actions for CI/CD. Run linting with ruff, type checking with mypy, tests with pytest, and build your Docker image on each push. Deploy to your server or cloud platform on main branch pushes."},
+      {"role": "user", "content": "What cloud platform is best for a FastAPI app?"},
+      {"role": "assistant", "content": "Railway, Fly.io, and Render are excellent for small to medium FastAPI deployments. They have simple Docker-based deploys. For larger scale, use AWS ECS or Google Cloud Run. All support auto-scaling and managed PostgreSQL."},
+      {"role": "user", "content": "How do I monitor my app in production? Any APM recommendations?"}
+    ]
+  },
+  {
+    "id": "mt-15",
+    "messages": [
+      {"role": "system", "content": "You are a helpful assistant."},
+      {"role": "user", "content": "Production monitoring questions."},
+      {"role": "assistant", "content": "Monitoring is crucial for production apps."},
+      {"role": "user", "content": "APM tool recommendations for FastAPI?"},
+      {"role": "assistant", "content": "Use Sentry for error tracking and performance monitoring. It has a free tier and excellent FastAPI/Starlette integration. For infrastructure metrics, use Prometheus + Grafana. For logs, use structured logging with python-json-logger."},
+      {"role": "user", "content": "What about API rate limiting to prevent abuse?"},
+      {"role": "assistant", "content": "Implement rate limiting using slowapi or a custom middleware with Redis. Apply stricter limits to auth endpoints to prevent brute force attacks. Use token bucket or sliding window algorithms."},
+      {"role": "user", "content": "Should I add API versioning from the start?"}
+    ]
+  },
+  {
+    "id": "mt-16",
+    "messages": [
+      {"role": "system", "content": "You are a helpful assistant."},
+      {"role": "user", "content": "Rate limiting and API versioning advice."},
+      {"role": "assistant", "content": "Rate limiting protects your API. API versioning prevents breaking changes."},
+      {"role": "user", "content": "Should I version my API from the start?"},
+      {"role": "assistant", "content": "Yes! Start with URL-based versioning like /api/v1/. It's simple and explicit. Even if v1 is your only version initially, having the prefix makes it easy to add v2 later without breaking existing clients."},
+      {"role": "user", "content": "What about API documentation for consumers?"},
+      {"role": "assistant", "content": "FastAPI generates OpenAPI docs automatically. Customize the OpenAPI metadata with title, description, and version. Add detailed docstrings to your endpoints. Consider adding a Postman collection or an OpenAPI spec file in your repo."},
+      {"role": "user", "content": "Last question: what's the best way to handle database migrations?"}
+    ]
+  },
+  {
+    "id": "mt-17",
+    "messages": [
+      {"role": "system", "content": "You are a helpful assistant."},
+      {"role": "user", "content": "Database migration tools for FastAPI."},
+      {"role": "assistant", "content": "Database migrations are essential for evolving your schema safely."},
+      {"role": "user", "content": "What tool should I use for FastAPI + SQLAlchemy migrations?"},
+      {"role": "assistant", "content": "Use Alembic which is the official migration tool for SQLAlchemy. It auto-generates migration scripts from your model changes. Run migrations as part of your deployment process, not at app startup."},
+      {"role": "user", "content": "Thanks for all the advice! One more thing: how do I handle soft deletes for tasks?"},
+      {"role": "assistant", "content": "Use a deleted_at nullable timestamp column. Filter out soft-deleted records in your queries with a visibility filter. This allows recovery and maintains referential integrity."},
+      {"role": "user", "content": "Perfect, that covers all my questions. Thanks for the thorough help!"}
+    ]
+  },
+  {
+    "id": "mt-18",
+    "messages": [
+      {"role": "system", "content": "You are a helpful assistant."},
+      {"role": "user", "content": "Database migration and soft delete advice."},
+      {"role": "assistant", "content": "Alembic for migrations, nullable deleted_at for soft deletes."},
+      {"role": "user", "content": "How do I ensure migrations run safely in production?"},
+      {"role": "assistant", "content": "Run migrations as a separate step before deploying new code. Use transactions so a failed migration rolls back cleanly. Test migrations on a staging environment first. Never auto-run migrations on app startup in production."},
+      {"role": "user", "content": "What about database connection pooling?"},
+      {"role": "assistant", "content": "SQLAlchemy has built-in connection pooling. For async, use asyncpg's pool. Set min and max pool sizes based on your expected concurrency. Monitor pool usage to detect connection leaks."},
+      {"role": "user", "content": "How do I handle data pagination for listing endpoints?"}
+    ]
+  },
+  {
+    "id": "mt-19",
+    "messages": [
+      {"role": "system", "content": "You are a helpful assistant."},
+      {"role": "user", "content": "Pagination and query optimization."},
+      {"role": "assistant", "content": "Pagination prevents large responses. Cursor-based is best for real-time data."},
+      {"role": "user", "content": "How should I implement pagination?"},
+      {"role": "assistant", "content": "Use cursor-based pagination for real-time data and offset-based for simple lists. Always set a max page size to prevent abuse. Return total counts only when necessary since they're expensive on large tables."},
+      {"role": "user", "content": "How do I optimize slow database queries?"},
+      {"role": "assistant", "content": "Add database indexes on columns used in WHERE and JOIN clauses. Use eager loading for related data with SQLAlchemy's selectinload. Profile queries with EXPLAIN ANALYZE. Consider materialized views for complex reporting queries."},
+      {"role": "user", "content": "Should I add caching at the API layer?"}
+    ]
+  },
+  {
+    "id": "mt-20",
+    "messages": [
+      {"role": "system", "content": "You are a helpful assistant."},
+      {"role": "user", "content": "API caching and final recommendations."},
+      {"role": "assistant", "content": "Caching improves response times significantly for read-heavy APIs."},
+      {"role": "user", "content": "Should I implement API-level caching?"},
+      {"role": "assistant", "content": "Yes! Use Redis for API response caching. Cache GET endpoints for frequently accessed data. Set appropriate TTLs based on data freshness needs. Consider caching database query results for complex aggregations."},
+      {"role": "user", "content": "How do I invalidate cache when data changes?"},
+      {"role": "assistant", "content": "Use cache invalidation strategies: TTL-based (simplest), write-through (update cache on write), or event-based (invalidate on data change events). For your task manager, invalidate task caches when a task is created, updated, or deleted."},
+      {"role": "user", "content": "Thanks for all the help! I feel confident to build my app now."},
+      {"role": "assistant", "content": "You're welcome! Good luck with your FastAPI task manager. Start simple, iterate fast, and add complexity only when needed."},
+      {"role": "user", "content": "I'll start building today. One last thing: any tips for my first commit message?"},
+      {"role": "assistant", "content": "Keep it descriptive but concise. Something like 'feat: initial FastAPI project scaffold with auth and task CRUD'. Use conventional commits for consistency."},
+      {"role": "user", "content": "Perfect, thanks again! I really appreciate all the detailed advice."}
+    ]
+  }
+]

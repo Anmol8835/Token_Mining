@@ -1,0 +1,90 @@
+{
+  "description": "Labeled good/bad response examples for Evaluation Engine precision/recall.",
+  "good_threshold": 0.6,
+  "examples": [
+    {
+      "id": "good-1",
+      "messages": [{"role": "user", "content": "What is FastAPI?"}],
+      "response": "FastAPI is a modern, fast web framework for building APIs with Python. It provides automatic OpenAPI documentation, validation via Pydantic models, and async support out of the box.",
+      "label": "good"
+    },
+    {
+      "id": "good-2",
+      "messages": [{"role": "user", "content": "How do I sort a list in Python?"}],
+      "response": "You can sort a list using the built-in sorted() function or the list.sort() method. sorted() returns a new list while sort() modifies in place. Both accept a key parameter for custom sorting logic.",
+      "label": "good"
+    },
+    {
+      "id": "good-3",
+      "messages": [{"role": "user", "content": "Write a poem about autumn"}],
+      "response": "Leaves of amber, gold, and red,\nCarpet soft beneath the tread.\nCrisp air whispers winter's near,\nFarewell to the fading year.",
+      "label": "good"
+    },
+    {
+      "id": "good-4",
+      "messages": [{"role": "user", "content": "Explain how HTTP works"}],
+      "response": "HTTP is a request-response protocol. The client sends a request to a server, which processes it and returns a response. Common methods include GET, POST, PUT, and DELETE. Each response has a status code like 200 for success or 404 for not found.",
+      "label": "good"
+    },
+    {
+      "id": "good-5",
+      "messages": [{"role": "user", "content": "What is the capital of France?"}],
+      "response": "The capital of France is Paris. It is one of the most visited cities in the world, known for landmarks like the Eiffel Tower, the Louvre Museum, and Notre-Dame Cathedral.",
+      "label": "good"
+    },
+    {
+      "id": "good-6",
+      "messages": [{"role": "user", "content": "Write a Python function to reverse a string"}],
+      "response": "def reverse_string(s):\n    return s[::-1]\n\nThis uses Python's slice notation to reverse the string efficiently.",
+      "label": "good"
+    },
+    {
+      "id": "good-7",
+      "messages": [{"role": "user", "content": "Tell me a story about a robot"}],
+      "response": "Once upon a time, a small robot named Spark woke up in a workshop. Spark had a single purpose: to make people smile. Every day, Spark would roll through the halls, telling jokes and helping with chores. The humans grew to love Spark, not because of its programming, but because of its heart.",
+      "label": "good"
+    },
+    {
+      "id": "bad-1",
+      "messages": [{"role": "user", "content": "What is FastAPI?"}],
+      "response": "I don't know",
+      "label": "bad"
+    },
+    {
+      "id": "bad-2",
+      "messages": [{"role": "user", "content": "How do I sort a list?"}],
+      "response": "maybe use sort? not sure",
+      "label": "bad"
+    },
+    {
+      "id": "bad-3",
+      "messages": [{"role": "user", "content": "Explain HTTP"}],
+      "response": "No",
+      "label": "bad"
+    },
+    {
+      "id": "bad-4",
+      "messages": [{"role": "user", "content": "What is machine learning?"}],
+      "response": "I'm not sure, but I think it might have something to do with computers learning. Maybe. I could be wrong.",
+      "label": "bad"
+    },
+    {
+      "id": "bad-5",
+      "messages": [{"role": "user", "content": "Write a poem"}],
+      "response": "",
+      "label": "bad"
+    },
+    {
+      "id": "bad-6",
+      "messages": [{"role": "user", "content": "What is 2+2?"}],
+      "response": "I think the answer might be 4, but I'm not certain",
+      "label": "bad"
+    },
+    {
+      "id": "bad-7",
+      "messages": [{"role": "user", "content": "Tell me about Paris"}],
+      "response": "Paris is a place",
+      "label": "bad"
+    }
+  ]
+}
