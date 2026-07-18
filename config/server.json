@@ -1,9 +1,30 @@
 {
   "classifier": {
     "mode": "auto",
-    "ruleConfidenceThreshold": 2.0,
+    "cacheHours": 1,
+    "cacheMaxEntries": 2000,
     "llmClassifierModel": "deepseek-v4-flash",
-    "cacheHours": 1
+
+    "fusionConfidenceThreshold": 0.65,
+
+    "fusionWeights": {
+      "rule": 0.25,
+      "embedding": 0.30,
+      "profile": 0.15,
+      "llm": 0.30
+    },
+
+    "embedding": {
+      "minSimilarity": 0.15,
+      "topK": 3
+    },
+
+    "profile": {
+      "lowCharCount": 500,
+      "highCharCount": 12000,
+      "deepConversation": 8,
+      "longSystemPrompt": 3000
+    }
   },
   "router": {
     "costWeight": 0.3,

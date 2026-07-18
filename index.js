@@ -106,7 +106,7 @@ async function callProvider(provider, nativePayload, stream, res, modelId) {
 
 app.post("/v1/messages", async (req, res) => {
   const startTime = Date.now();
-
+  console.log(req.body.messages);
   try {
     const modelName = req.body.model || "auto";
     const mode = serverConfig.classifier?.mode || "auto";
@@ -127,7 +127,11 @@ app.post("/v1/messages", async (req, res) => {
 
     if (!selectedModel) {
       // Auto mode: classify + route
-      classification = await classifier.classify(req.body);
+      // Strip system prompt during classification — classifiers should
+      // judge user intent, not the system role. Re-injected at buildRequest.
+      const classBody = { ...req.body, system: undefined };
+      // console.log(classBody);
+      classification = await classifier.classify(classBody);
       const result = selectModel(classification, registry, serverConfig.router, null);
       selectedModel = result.model;
       console.log(`[classify] ${result.reason} (source: ${classification.source}, confidence: ${classification.confidence.toFixed(2)})`);
