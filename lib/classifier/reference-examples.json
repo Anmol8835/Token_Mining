@@ -1,275 +1,2331 @@
 {
-  "description": "Labeled reference examples for TF-IDF embedding similarity classifier. Each example is a realistic user request with its expected classification.",
-  "examples": [
-    {
-      "label": "coding-high-1",
-      "taskType": "coding",
-      "complexity": "high",
-      "costSensitivity": "standard",
-      "requiredCapabilities": { "needsTools": false, "needsVision": false, "needsStreaming": false },
-      "text": "Implement a distributed rate limiter using Redis and token bucket algorithm. Handle edge cases for clock skew, network partitions, and race conditions between multiple instances.",
-      "systemHint": "You are an expert software engineer"
-    },
-    {
-      "label": "coding-high-2",
-      "taskType": "coding",
-      "complexity": "high",
-      "costSensitivity": "standard",
-      "requiredCapabilities": { "needsTools": false, "needsVision": false, "needsStreaming": false },
-      "text": "Debug this race condition in the concurrent hash map implementation. There's a subtle bug where two threads can corrupt the linked list during rehashing. Find the root cause and fix it.",
-      "systemHint": "You are a senior systems engineer"
-    },
-    {
-      "label": "coding-high-3",
-      "taskType": "coding",
-      "complexity": "high",
-      "costSensitivity": "standard",
-      "requiredCapabilities": { "needsTools": false, "needsVision": false, "needsStreaming": false },
-      "text": "Write a recursive descent parser for a subset of JavaScript that handles expressions, function declarations, and control flow. The parser should produce an AST and report syntax errors with line numbers.",
-      "systemHint": "You are a compiler engineer"
-    },
-    {
-      "label": "coding-high-4",
-      "taskType": "coding",
-      "complexity": "high",
-      "costSensitivity": "standard",
-      "requiredCapabilities": { "needsTools": false, "needsVision": false, "needsStreaming": false },
-      "text": "Optimize this SQL query for a table with 10 million rows. Currently it does a full table scan. Add proper indexes, restructure the joins, and use window functions where appropriate.",
-      "systemHint": "You are a database performance expert"
-    },
-    {
-      "label": "coding-medium-1",
-      "taskType": "coding",
-      "complexity": "medium",
-      "costSensitivity": "standard",
-      "requiredCapabilities": { "needsTools": false, "needsVision": false, "needsStreaming": false },
-      "text": "Add proper error handling and input validation to this REST API endpoint. Return appropriate HTTP status codes and error messages for invalid requests, missing fields, and server errors.",
-      "systemHint": "You are a backend developer"
-    },
-    {
-      "label": "coding-medium-2",
-      "taskType": "coding",
-      "complexity": "medium",
-      "costSensitivity": "standard",
-      "requiredCapabilities": { "needsTools": false, "needsVision": false, "needsStreaming": false },
-      "text": "Write unit tests for this user authentication module. Cover login, registration, password reset, token refresh, and session expiry. Use the existing test framework and mock external dependencies.",
-      "systemHint": "You are a software developer"
-    },
-    {
-      "label": "coding-medium-3",
-      "taskType": "coding",
-      "complexity": "medium",
-      "costSensitivity": "standard",
-      "requiredCapabilities": { "needsTools": false, "needsVision": false, "needsStreaming": false },
-      "text": "Refactor this React component to use hooks instead of class components. Extract the data fetching logic into a custom hook and move the state management to useReducer.",
-      "systemHint": "You are a frontend developer"
-    },
-    {
-      "label": "coding-low-1",
-      "taskType": "coding",
-      "complexity": "low",
-      "costSensitivity": "budget",
-      "requiredCapabilities": { "needsTools": false, "needsVision": false, "needsStreaming": false },
-      "text": "What does git status do? Show me the command and explain the output.",
-      "systemHint": ""
-    },
-    {
-      "label": "coding-low-2",
-      "taskType": "coding",
-      "complexity": "low",
-      "costSensitivity": "budget",
-      "requiredCapabilities": { "needsTools": false, "needsVision": false, "needsStreaming": false },
-      "text": "How do I center a div vertically and horizontally using CSS flexbox?",
-      "systemHint": ""
-    },
-    {
-      "label": "analysis-high-1",
-      "taskType": "analysis",
-      "complexity": "high",
-      "costSensitivity": "standard",
-      "requiredCapabilities": { "needsTools": false, "needsVision": false, "needsStreaming": false },
-      "text": "Compare the performance characteristics of B-trees versus LSM trees for write-heavy workloads. Analyze read amplification, write amplification, and space amplification across different access patterns and dataset sizes.",
-      "systemHint": "You are a database researcher"
-    },
-    {
-      "label": "analysis-high-2",
-      "taskType": "analysis",
-      "complexity": "high",
-      "costSensitivity": "standard",
-      "requiredCapabilities": { "needsTools": false, "needsVision": false, "needsStreaming": false },
-      "text": "Analyze this distributed system architecture diagram for potential failure modes. Consider network partitions, cascading failures, thundering herd problems, and single points of failure. Propose mitigations.",
-      "systemHint": "You are a systems architect"
-    },
-    {
-      "label": "analysis-medium-1",
-      "taskType": "analysis",
-      "complexity": "medium",
-      "costSensitivity": "standard",
-      "requiredCapabilities": { "needsTools": false, "needsVision": false, "needsStreaming": false },
-      "text": "What are the tradeoffs between REST and GraphQL for a mobile app backend? Consider bandwidth usage, caching, type safety, and developer experience.",
-      "systemHint": ""
-    },
-    {
-      "label": "analysis-medium-2",
-      "taskType": "analysis",
-      "complexity": "medium",
-      "costSensitivity": "standard",
-      "requiredCapabilities": { "needsTools": false, "needsVision": false, "needsStreaming": false },
-      "text": "Review this code for security vulnerabilities. Look for SQL injection, XSS, CSRF, insecure deserialization, and authentication bypass issues.",
-      "systemHint": "You are a security engineer"
-    },
-    {
-      "label": "agentic-high-1",
-      "taskType": "agentic",
-      "complexity": "high",
-      "costSensitivity": "standard",
-      "requiredCapabilities": { "needsTools": true, "needsVision": false, "needsStreaming": false },
-      "text": "Clone this repository, find all instances of SQL injection vulnerabilities using grep and code analysis tools, then create a PR with fixes for each one. Run the test suite to make sure nothing breaks.",
-      "systemHint": "You are Claude Code, an AI coding assistant with access to file system tools, bash, and git operations"
-    },
-    {
-      "label": "agentic-high-2",
-      "taskType": "agentic",
-      "complexity": "high",
-      "costSensitivity": "standard",
-      "requiredCapabilities": { "needsTools": true, "needsVision": false, "needsStreaming": false },
-      "text": "Analyze the performance of this web application. Profile the slow endpoints, identify database query bottlenecks, add appropriate indexes, and implement caching where needed. Deploy the changes to staging.",
-      "systemHint": "You are Claude Code with access to bash, file editing, and deployment tools"
-    },
-    {
-      "label": "agentic-high-3",
-      "taskType": "agentic",
-      "complexity": "high",
-      "costSensitivity": "standard",
-      "requiredCapabilities": { "needsTools": true, "needsVision": false, "needsStreaming": false },
-      "text": "Set up a complete CI/CD pipeline for this Node.js project. Configure GitHub Actions for linting, testing, building Docker images, and deploying to Kubernetes. Include environment-specific configurations.",
-      "systemHint": "You are Claude Code with access to file editing, bash, and GitHub API"
-    },
-    {
-      "label": "agentic-medium-1",
-      "taskType": "agentic",
-      "complexity": "medium",
-      "costSensitivity": "standard",
-      "requiredCapabilities": { "needsTools": true, "needsVision": false, "needsStreaming": false },
-      "text": "Use your file search tool to find all TODO comments in this codebase, then create GitHub issues for each one with the relevant code context and file paths.",
-      "systemHint": "You are an AI assistant with tool use capabilities"
-    },
-    {
-      "label": "creative-medium-1",
-      "taskType": "creative",
-      "complexity": "medium",
-      "costSensitivity": "standard",
-      "requiredCapabilities": { "needsTools": false, "needsVision": false, "needsStreaming": false },
-      "text": "Write a short story about a robot learning to paint. Explore themes of creativity, consciousness, and what it means to create art. The story should be about 1000 words with a bittersweet ending.",
-      "systemHint": "You are a creative writer"
-    },
-    {
-      "label": "creative-medium-2",
-      "taskType": "creative",
-      "complexity": "medium",
-      "costSensitivity": "standard",
-      "requiredCapabilities": { "needsTools": false, "needsVision": false, "needsStreaming": false },
-      "text": "Create a marketing email template for a SaaS product launch. Include subject line options, body copy with value proposition, social proof section, and a clear call to action. Make it engaging and conversion-focused.",
-      "systemHint": "You are a marketing copywriter"
-    },
-    {
-      "label": "summarization-low-1",
-      "taskType": "summarization",
-      "complexity": "low",
-      "costSensitivity": "budget",
-      "requiredCapabilities": { "needsTools": false, "needsVision": false, "needsStreaming": false },
-      "text": "Summarize this research paper in 3 bullet points. Focus on the key findings, methodology, and implications for practitioners.",
-      "systemHint": ""
-    },
-    {
-      "label": "summarization-low-2",
-      "taskType": "summarization",
-      "complexity": "low",
-      "costSensitivity": "budget",
-      "requiredCapabilities": { "needsTools": false, "needsVision": false, "needsStreaming": false },
-      "text": "Give me the TLDR of this meeting transcript. What were the key decisions made and action items assigned?",
-      "systemHint": ""
-    },
-    {
-      "label": "extraction-medium-1",
-      "taskType": "extraction",
-      "complexity": "medium",
-      "costSensitivity": "standard",
-      "requiredCapabilities": { "needsTools": false, "needsVision": false, "needsStreaming": false },
-      "text": "Extract all email addresses, phone numbers, and company names from this text and return them as structured JSON with separate arrays for each type.",
-      "systemHint": ""
-    },
-    {
-      "label": "extraction-medium-2",
-      "taskType": "extraction",
-      "complexity": "medium",
-      "costSensitivity": "standard",
-      "requiredCapabilities": { "needsTools": false, "needsVision": false, "needsStreaming": false },
-      "text": "Parse this invoice PDF text and extract the invoice number, date, line items with quantities and prices, subtotal, tax, and total amount. Return as clean JSON.",
-      "systemHint": ""
-    },
-    {
-      "label": "translation-low-1",
-      "taskType": "translation",
-      "complexity": "low",
-      "costSensitivity": "budget",
-      "requiredCapabilities": { "needsTools": false, "needsVision": false, "needsStreaming": false },
-      "text": "Translate this technical documentation page from English to Spanish. Keep all code snippets unchanged and maintain consistent terminology for technical terms.",
-      "systemHint": ""
-    },
-    {
-      "label": "chat-low-1",
-      "taskType": "chat",
-      "complexity": "low",
-      "costSensitivity": "budget",
-      "requiredCapabilities": { "needsTools": false, "needsVision": false, "needsStreaming": false },
-      "text": "Hello! How are you doing today?",
-      "systemHint": ""
-    },
-    {
-      "label": "chat-low-2",
-      "taskType": "chat",
-      "complexity": "low",
-      "costSensitivity": "budget",
-      "requiredCapabilities": { "needsTools": false, "needsVision": false, "needsStreaming": false },
-      "text": "What's the weather like in San Francisco right now?",
-      "systemHint": ""
-    },
-    {
-      "label": "chat-low-3",
-      "taskType": "chat",
-      "complexity": "low",
-      "costSensitivity": "budget",
-      "requiredCapabilities": { "needsTools": false, "needsVision": false, "needsStreaming": false },
-      "text": "Tell me a joke about programming.",
-      "systemHint": ""
-    },
-    {
-      "label": "vision-image-1",
-      "taskType": "analysis",
-      "complexity": "medium",
-      "costSensitivity": "standard",
-      "requiredCapabilities": { "needsTools": false, "needsVision": true, "needsStreaming": false },
-      "text": "Describe what's shown in this image in detail. Identify all objects, people, text, and the overall scene context.",
-      "systemHint": "You have vision capabilities to analyze images"
-    },
-    {
-      "label": "vision-chart-1",
-      "taskType": "analysis",
-      "complexity": "medium",
-      "costSensitivity": "standard",
-      "requiredCapabilities": { "needsTools": false, "needsVision": true, "needsStreaming": false },
-      "text": "Analyze this chart and tell me what trends you see. What are the key data points, anomalies, and what conclusions can we draw?",
-      "systemHint": "You can process and analyze images and charts"
-    },
-    {
-      "label": "vision-code-1",
-      "taskType": "coding",
-      "complexity": "medium",
-      "costSensitivity": "standard",
-      "requiredCapabilities": { "needsTools": false, "needsVision": true, "needsStreaming": false },
-      "text": "Look at this screenshot of the error message and the surrounding code. What's causing this bug and how do I fix it?",
-      "systemHint": "You can view and analyze screenshots"
-    }
-  ]
+ "examples": [
+  {
+   "label": "fact_lookup-low-1",
+   "primary_task": "fact_lookup",
+   "secondary_tasks": [],
+   "domain": "general",
+   "subdomain": null,
+   "complexity": "low",
+   "risk": "low",
+   "freshness": "not_required",
+   "latency_preference": "fast",
+   "capabilities": [
+    "basic_generation"
+   ],
+   "input_modalities": [
+    "text"
+   ],
+   "output_format": "text",
+   "text": "What is the capital of Australia?",
+   "systemHint": ""
+  },
+  {
+   "label": "fact_lookup-low-2",
+   "primary_task": "fact_lookup",
+   "secondary_tasks": [],
+   "domain": "science",
+   "subdomain": null,
+   "complexity": "low",
+   "risk": "low",
+   "freshness": "not_required",
+   "latency_preference": "normal",
+   "capabilities": [
+    "basic_generation"
+   ],
+   "input_modalities": [
+    "text"
+   ],
+   "output_format": "text",
+   "text": "How many moons does Jupiter have?",
+   "systemHint": ""
+  },
+  {
+   "label": "fact_lookup-low-3",
+   "primary_task": "fact_lookup",
+   "secondary_tasks": [],
+   "domain": "general",
+   "subdomain": null,
+   "complexity": "low",
+   "risk": "low",
+   "freshness": "not_required",
+   "latency_preference": "normal",
+   "capabilities": [
+    "basic_generation"
+   ],
+   "input_modalities": [
+    "text"
+   ],
+   "output_format": "text",
+   "text": "Who wrote the novel Moby Dick and when was it published?",
+   "systemHint": ""
+  },
+  {
+   "label": "fact_lookup-low-4",
+   "primary_task": "fact_lookup",
+   "secondary_tasks": [],
+   "domain": "finance",
+   "subdomain": "investing",
+   "complexity": "low",
+   "risk": "low",
+   "freshness": "real_time",
+   "latency_preference": "fast",
+   "capabilities": [
+    "basic_generation",
+    "web_search"
+   ],
+   "input_modalities": [
+    "text"
+   ],
+   "output_format": "text",
+   "text": "What is the current price of gold per ounce right now?",
+   "systemHint": ""
+  },
+  {
+   "label": "fact_check-medium-1",
+   "primary_task": "fact_check",
+   "secondary_tasks": [],
+   "domain": "science",
+   "subdomain": null,
+   "complexity": "medium",
+   "risk": "low",
+   "freshness": "not_required",
+   "latency_preference": "normal",
+   "capabilities": [
+    "web_search",
+    "source_citation",
+    "deep_reasoning"
+   ],
+   "input_modalities": [
+    "text"
+   ],
+   "output_format": "text",
+   "text": "Is it true that the Great Wall of China is visible from space with the naked eye?",
+   "systemHint": ""
+  },
+  {
+   "label": "fact_check-medium-2",
+   "primary_task": "fact_check",
+   "secondary_tasks": [],
+   "domain": "health",
+   "subdomain": "clinical",
+   "complexity": "medium",
+   "risk": "medium",
+   "freshness": "not_required",
+   "latency_preference": "normal",
+   "capabilities": [
+    "web_search",
+    "source_citation",
+    "deep_reasoning"
+   ],
+   "input_modalities": [
+    "text"
+   ],
+   "output_format": "text",
+   "text": "Someone told me that vaccines cause autism. Can you verify whether that claim holds up?",
+   "systemHint": ""
+  },
+  {
+   "label": "fact_check-medium-3",
+   "primary_task": "fact_check",
+   "secondary_tasks": [],
+   "domain": "politics",
+   "subdomain": null,
+   "complexity": "medium",
+   "risk": "low",
+   "freshness": "recent",
+   "latency_preference": "normal",
+   "capabilities": [
+    "web_search",
+    "source_citation"
+   ],
+   "input_modalities": [
+    "text"
+   ],
+   "output_format": "text",
+   "text": "A friend claimed the new tax bill raises rates on anyone earning under $50k. Is that accurate?",
+   "systemHint": ""
+  },
+  {
+   "label": "fact_check-low-4",
+   "primary_task": "fact_check",
+   "secondary_tasks": [],
+   "domain": "general",
+   "subdomain": null,
+   "complexity": "low",
+   "risk": "low",
+   "freshness": "not_required",
+   "latency_preference": "fast",
+   "capabilities": [
+    "web_search",
+    "source_citation"
+   ],
+   "input_modalities": [
+    "text"
+   ],
+   "output_format": "text",
+   "text": "True or false: goldfish only have a three second memory span.",
+   "systemHint": ""
+  },
+  {
+   "label": "explanation-medium-1",
+   "primary_task": "explanation",
+   "secondary_tasks": [],
+   "domain": "science",
+   "subdomain": "physics",
+   "complexity": "medium",
+   "risk": "low",
+   "freshness": "not_required",
+   "latency_preference": "normal",
+   "capabilities": [
+    "basic_generation"
+   ],
+   "input_modalities": [
+    "text"
+   ],
+   "output_format": "text",
+   "text": "Why does the sky turn red and orange during sunset instead of staying blue?",
+   "systemHint": ""
+  },
+  {
+   "label": "explanation-low-2",
+   "primary_task": "explanation",
+   "secondary_tasks": [],
+   "domain": "general",
+   "subdomain": null,
+   "complexity": "low",
+   "risk": "low",
+   "freshness": "not_required",
+   "latency_preference": "normal",
+   "capabilities": [
+    "basic_generation"
+   ],
+   "input_modalities": [
+    "text"
+   ],
+   "output_format": "text",
+   "text": "How does compound interest actually work on a savings account?",
+   "systemHint": ""
+  },
+  {
+   "label": "explanation-medium-3",
+   "primary_task": "explanation",
+   "secondary_tasks": [],
+   "domain": "legal",
+   "subdomain": "contracts",
+   "complexity": "medium",
+   "risk": "medium",
+   "freshness": "not_required",
+   "latency_preference": "normal",
+   "capabilities": [
+    "basic_generation"
+   ],
+   "input_modalities": [
+    "text"
+   ],
+   "output_format": "text",
+   "text": "Act as a lawyer and explain, in plain terms, whether my landlord is allowed to keep my entire security deposit for normal wear and tear.",
+   "systemHint": ""
+  },
+  {
+   "label": "explanation-medium-4",
+   "primary_task": "explanation",
+   "secondary_tasks": [],
+   "domain": "finance",
+   "subdomain": "personal_finance",
+   "complexity": "medium",
+   "risk": "low",
+   "freshness": "not_required",
+   "latency_preference": "normal",
+   "capabilities": [
+    "basic_generation"
+   ],
+   "input_modalities": [
+    "text"
+   ],
+   "output_format": "text",
+   "text": "You are a senior accountant. Explain how depreciation affects a small business's taxable income.",
+   "systemHint": ""
+  },
+  {
+   "label": "research-high-1",
+   "primary_task": "research",
+   "secondary_tasks": [
+    "document_generation"
+   ],
+   "domain": "data_science",
+   "subdomain": "machine_learning",
+   "complexity": "high",
+   "risk": "low",
+   "freshness": "recent",
+   "latency_preference": "quality_first",
+   "capabilities": [
+    "web_search",
+    "source_citation",
+    "deep_reasoning"
+   ],
+   "input_modalities": [
+    "text"
+   ],
+   "output_format": "report",
+   "text": "Research the latest approaches to retrieval-augmented generation from the past year and put together a report with citations comparing their tradeoffs.",
+   "systemHint": "You are a research assistant"
+  },
+  {
+   "label": "research-high-2",
+   "primary_task": "research",
+   "secondary_tasks": [],
+   "domain": "health",
+   "subdomain": "nutrition",
+   "complexity": "high",
+   "risk": "medium",
+   "freshness": "recent",
+   "latency_preference": "quality_first",
+   "capabilities": [
+    "web_search",
+    "source_citation",
+    "deep_reasoning"
+   ],
+   "input_modalities": [
+    "text"
+   ],
+   "output_format": "text",
+   "text": "Gather what peer reviewed studies say about intermittent fasting and long term cardiovascular health, and summarize the consensus.",
+   "systemHint": ""
+  },
+  {
+   "label": "research-medium-3",
+   "primary_task": "research",
+   "secondary_tasks": [],
+   "domain": "business",
+   "subdomain": "strategy",
+   "complexity": "high",
+   "risk": "low",
+   "freshness": "recent",
+   "latency_preference": "normal",
+   "capabilities": [
+    "web_search",
+    "source_citation"
+   ],
+   "input_modalities": [
+    "text"
+   ],
+   "output_format": "text",
+   "text": "Compile information from multiple sources on how competitors in the meal kit industry are pricing their subscription tiers this year.",
+   "systemHint": ""
+  },
+  {
+   "label": "research-high-4",
+   "primary_task": "research",
+   "secondary_tasks": [],
+   "domain": "cybersecurity",
+   "subdomain": "threat_intel",
+   "complexity": "high",
+   "risk": "medium",
+   "freshness": "recent",
+   "latency_preference": "quality_first",
+   "capabilities": [
+    "web_search",
+    "source_citation",
+    "deep_reasoning"
+   ],
+   "input_modalities": [
+    "text"
+   ],
+   "output_format": "report",
+   "text": "Survey the current state of the art in ransomware detection techniques and give me a comprehensive overview with sources.",
+   "systemHint": ""
+  },
+  {
+   "label": "analysis-high-1",
+   "primary_task": "analysis",
+   "secondary_tasks": [],
+   "domain": "data_science",
+   "subdomain": "analytics",
+   "complexity": "high",
+   "risk": "low",
+   "freshness": "not_required",
+   "latency_preference": "normal",
+   "capabilities": [
+    "deep_reasoning",
+    "structured_output"
+   ],
+   "input_modalities": [
+    "text",
+    "structured_data"
+   ],
+   "output_format": "text",
+   "text": "Here is our quarterly signup data by channel. Analyze it and identify which acquisition channels are showing the strongest trend.",
+   "systemHint": ""
+  },
+  {
+   "label": "analysis-medium-2",
+   "primary_task": "analysis",
+   "secondary_tasks": [],
+   "domain": "business",
+   "subdomain": "strategy",
+   "complexity": "medium",
+   "risk": "low",
+   "freshness": "not_required",
+   "latency_preference": "normal",
+   "capabilities": [
+    "deep_reasoning"
+   ],
+   "input_modalities": [
+    "text"
+   ],
+   "output_format": "text",
+   "text": "Break down why our churn rate spiked last quarter based on the support ticket themes I pasted below.",
+   "systemHint": ""
+  },
+  {
+   "label": "analysis-high-3",
+   "primary_task": "analysis",
+   "secondary_tasks": [],
+   "domain": "finance",
+   "subdomain": "investing",
+   "complexity": "high",
+   "risk": "medium",
+   "freshness": "not_required",
+   "latency_preference": "normal",
+   "capabilities": [
+    "deep_reasoning"
+   ],
+   "input_modalities": [
+    "text"
+   ],
+   "output_format": "text",
+   "text": "Evaluate this company's balance sheet and cash flow statement and tell me what patterns concern you most.",
+   "systemHint": ""
+  },
+  {
+   "label": "analysis-medium-4",
+   "primary_task": "analysis",
+   "secondary_tasks": [],
+   "domain": "general",
+   "subdomain": null,
+   "complexity": "medium",
+   "risk": "low",
+   "freshness": "not_required",
+   "latency_preference": "normal",
+   "capabilities": [
+    "deep_reasoning"
+   ],
+   "input_modalities": [
+    "text"
+   ],
+   "output_format": "text",
+   "text": "What insights can you pull out of these survey responses about why customers are cancelling?",
+   "systemHint": ""
+  },
+  {
+   "label": "logical_reasoning-high-1",
+   "primary_task": "logical_reasoning",
+   "secondary_tasks": [],
+   "domain": "mathematics",
+   "subdomain": null,
+   "complexity": "high",
+   "risk": "low",
+   "freshness": "not_required",
+   "latency_preference": "normal",
+   "capabilities": [
+    "deep_reasoning",
+    "deterministic_output"
+   ],
+   "input_modalities": [
+    "text"
+   ],
+   "output_format": "text",
+   "text": "Three people are suspects. Only one is lying. A says B is guilty, B says A is lying, C says A is innocent. Who is guilty?",
+   "systemHint": ""
+  },
+  {
+   "label": "logical_reasoning-medium-2",
+   "primary_task": "logical_reasoning",
+   "secondary_tasks": [],
+   "domain": "general",
+   "subdomain": null,
+   "complexity": "medium",
+   "risk": "low",
+   "freshness": "not_required",
+   "latency_preference": "normal",
+   "capabilities": [
+    "deep_reasoning"
+   ],
+   "input_modalities": [
+    "text"
+   ],
+   "output_format": "text",
+   "text": "Is this argument logically valid: all birds can fly, penguins are birds, therefore penguins can fly?",
+   "systemHint": ""
+  },
+  {
+   "label": "logical_reasoning-high-3",
+   "primary_task": "logical_reasoning",
+   "secondary_tasks": [],
+   "domain": "mathematics",
+   "subdomain": null,
+   "complexity": "high",
+   "risk": "low",
+   "freshness": "not_required",
+   "latency_preference": "normal",
+   "capabilities": [
+    "deep_reasoning"
+   ],
+   "input_modalities": [
+    "text"
+   ],
+   "output_format": "text",
+   "text": "Solve this classic brain teaser: a farmer needs to cross a river with a wolf, a goat, and a cabbage, but the boat only fits one at a time.",
+   "systemHint": ""
+  },
+  {
+   "label": "mathematics-high-1",
+   "primary_task": "mathematics",
+   "secondary_tasks": [],
+   "domain": "mathematics",
+   "subdomain": "calculus",
+   "complexity": "high",
+   "risk": "low",
+   "freshness": "not_required",
+   "latency_preference": "normal",
+   "capabilities": [
+    "deep_reasoning",
+    "deterministic_output"
+   ],
+   "input_modalities": [
+    "text"
+   ],
+   "output_format": "text",
+   "text": "Compute the integral of x squared times sine of x with respect to x, showing the integration by parts steps.",
+   "systemHint": ""
+  },
+  {
+   "label": "mathematics-medium-2",
+   "primary_task": "mathematics",
+   "secondary_tasks": [],
+   "domain": "mathematics",
+   "subdomain": "algebra",
+   "complexity": "medium",
+   "risk": "low",
+   "freshness": "not_required",
+   "latency_preference": "normal",
+   "capabilities": [
+    "deep_reasoning",
+    "deterministic_output"
+   ],
+   "input_modalities": [
+    "text"
+   ],
+   "output_format": "text",
+   "text": "Solve for x: 3x squared minus 12x plus 9 equals zero.",
+   "systemHint": ""
+  },
+  {
+   "label": "mathematics-high-3",
+   "primary_task": "mathematics",
+   "secondary_tasks": [],
+   "domain": "mathematics",
+   "subdomain": "probability",
+   "complexity": "high",
+   "risk": "low",
+   "freshness": "not_required",
+   "latency_preference": "normal",
+   "capabilities": [
+    "deep_reasoning",
+    "deterministic_output"
+   ],
+   "input_modalities": [
+    "text"
+   ],
+   "output_format": "text",
+   "text": "What is the probability of drawing four cards of the same suit from a standard deck without replacement?",
+   "systemHint": ""
+  },
+  {
+   "label": "decision_support-high-1",
+   "primary_task": "decision_support",
+   "secondary_tasks": [],
+   "domain": "software_engineering",
+   "subdomain": "databases",
+   "complexity": "high",
+   "risk": "low",
+   "freshness": "not_required",
+   "latency_preference": "normal",
+   "capabilities": [
+    "deep_reasoning"
+   ],
+   "input_modalities": [
+    "text"
+   ],
+   "output_format": "text",
+   "text": "Should we use Postgres or MongoDB for a new service that stores user activity events with heavy read patterns? Help me decide.",
+   "systemHint": ""
+  },
+  {
+   "label": "decision_support-medium-2",
+   "primary_task": "decision_support",
+   "secondary_tasks": [],
+   "domain": "personal_advice",
+   "subdomain": "career",
+   "complexity": "medium",
+   "risk": "low",
+   "freshness": "not_required",
+   "latency_preference": "normal",
+   "capabilities": [
+    "deep_reasoning"
+   ],
+   "input_modalities": [
+    "text"
+   ],
+   "output_format": "text",
+   "text": "I have two job offers, one with higher pay but a longer commute and one with better growth but lower pay. Which one should I take?",
+   "systemHint": ""
+  },
+  {
+   "label": "decision_support-high-3",
+   "primary_task": "decision_support",
+   "secondary_tasks": [],
+   "domain": "finance",
+   "subdomain": "personal_finance",
+   "complexity": "high",
+   "risk": "medium",
+   "freshness": "not_required",
+   "latency_preference": "normal",
+   "capabilities": [
+    "deep_reasoning"
+   ],
+   "input_modalities": [
+    "text"
+   ],
+   "output_format": "text",
+   "text": "Weigh the pros and cons of paying off my mortgage early versus investing the extra cash in index funds.",
+   "systemHint": ""
+  },
+  {
+   "label": "planning-high-1",
+   "primary_task": "planning",
+   "secondary_tasks": [],
+   "domain": "business",
+   "subdomain": "strategy",
+   "complexity": "high",
+   "risk": "low",
+   "freshness": "not_required",
+   "latency_preference": "normal",
+   "capabilities": [
+    "deep_reasoning"
+   ],
+   "input_modalities": [
+    "text"
+   ],
+   "output_format": "numbered_list",
+   "text": "Create a 90 day roadmap for launching our product in a new country, including regulatory, marketing, and hiring milestones.",
+   "systemHint": ""
+  },
+  {
+   "label": "planning-medium-2",
+   "primary_task": "planning",
+   "secondary_tasks": [],
+   "domain": "travel",
+   "subdomain": "planning",
+   "complexity": "medium",
+   "risk": "low",
+   "freshness": "not_required",
+   "latency_preference": "normal",
+   "capabilities": [
+    "basic_generation"
+   ],
+   "input_modalities": [
+    "text"
+   ],
+   "output_format": "text",
+   "text": "Make me a 5 day itinerary for a trip to Kyoto focused on temples and food.",
+   "systemHint": ""
+  },
+  {
+   "label": "planning-medium-3",
+   "primary_task": "planning",
+   "secondary_tasks": [],
+   "domain": "education",
+   "subdomain": "curriculum",
+   "complexity": "medium",
+   "risk": "low",
+   "freshness": "not_required",
+   "latency_preference": "normal",
+   "capabilities": [
+    "basic_generation"
+   ],
+   "input_modalities": [
+    "text"
+   ],
+   "output_format": "text",
+   "text": "Help me organize a study schedule for the next 6 weeks leading up to my certification exam.",
+   "systemHint": ""
+  },
+  {
+   "label": "prediction-high-1",
+   "primary_task": "prediction",
+   "secondary_tasks": [],
+   "domain": "finance",
+   "subdomain": "investing",
+   "complexity": "high",
+   "risk": "medium",
+   "freshness": "not_required",
+   "latency_preference": "normal",
+   "capabilities": [
+    "deep_reasoning"
+   ],
+   "input_modalities": [
+    "text"
+   ],
+   "output_format": "text",
+   "text": "Based on current trends, how likely is it that remote work adoption keeps rising over the next five years?",
+   "systemHint": ""
+  },
+  {
+   "label": "prediction-medium-2",
+   "primary_task": "prediction",
+   "secondary_tasks": [],
+   "domain": "business",
+   "subdomain": null,
+   "complexity": "medium",
+   "risk": "low",
+   "freshness": "not_required",
+   "latency_preference": "normal",
+   "capabilities": [
+    "deep_reasoning"
+   ],
+   "input_modalities": [
+    "text"
+   ],
+   "output_format": "text",
+   "text": "Will electric vehicles outsell gas cars globally by 2030, given current adoption curves?",
+   "systemHint": ""
+  },
+  {
+   "label": "prediction-high-3",
+   "primary_task": "prediction",
+   "secondary_tasks": [],
+   "domain": "science",
+   "subdomain": null,
+   "complexity": "high",
+   "risk": "low",
+   "freshness": "not_required",
+   "latency_preference": "normal",
+   "capabilities": [
+    "deep_reasoning"
+   ],
+   "input_modalities": [
+    "text"
+   ],
+   "output_format": "text",
+   "text": "What's the outlook for fusion power becoming commercially viable in the next two decades?",
+   "systemHint": ""
+  },
+  {
+   "label": "summarization-low-1",
+   "primary_task": "summarization",
+   "secondary_tasks": [],
+   "domain": "general",
+   "subdomain": null,
+   "complexity": "low",
+   "risk": "low",
+   "freshness": "not_required",
+   "latency_preference": "fast",
+   "capabilities": [
+    "basic_generation"
+   ],
+   "input_modalities": [
+    "text"
+   ],
+   "output_format": "bullet_points",
+   "text": "Summarize this article in 3 bullet points for me.",
+   "systemHint": ""
+  },
+  {
+   "label": "summarization-low-2",
+   "primary_task": "summarization",
+   "secondary_tasks": [],
+   "domain": "business",
+   "subdomain": null,
+   "complexity": "low",
+   "risk": "low",
+   "freshness": "not_required",
+   "latency_preference": "fast",
+   "capabilities": [
+    "basic_generation"
+   ],
+   "input_modalities": [
+    "text"
+   ],
+   "output_format": "summary",
+   "text": "Give me a tldr of this 40 minute meeting transcript I'm pasting below.",
+   "systemHint": ""
+  },
+  {
+   "label": "summarization-medium-3",
+   "primary_task": "summarization",
+   "secondary_tasks": [],
+   "domain": "legal",
+   "subdomain": "contracts",
+   "complexity": "medium",
+   "risk": "medium",
+   "freshness": "not_required",
+   "latency_preference": "normal",
+   "capabilities": [
+    "basic_generation"
+   ],
+   "input_modalities": [
+    "text",
+    "document"
+   ],
+   "output_format": "summary",
+   "text": "Condense this 20 page vendor contract into the key obligations and deadlines for both parties.",
+   "systemHint": ""
+  },
+  {
+   "label": "extraction-low-1",
+   "primary_task": "extraction",
+   "secondary_tasks": [],
+   "domain": "general",
+   "subdomain": null,
+   "complexity": "low",
+   "risk": "low",
+   "freshness": "not_required",
+   "latency_preference": "fast",
+   "capabilities": [
+    "structured_output"
+   ],
+   "input_modalities": [
+    "text"
+   ],
+   "output_format": "json",
+   "text": "Extract all the email addresses and phone numbers from this text into JSON.",
+   "systemHint": ""
+  },
+  {
+   "label": "extraction-low-2",
+   "primary_task": "extraction",
+   "secondary_tasks": [],
+   "domain": "human_resources",
+   "subdomain": "recruiting",
+   "complexity": "low",
+   "risk": "low",
+   "freshness": "not_required",
+   "latency_preference": "normal",
+   "capabilities": [
+    "structured_output"
+   ],
+   "input_modalities": [
+    "text",
+    "document"
+   ],
+   "output_format": "table",
+   "text": "Pull out the candidate's name, years of experience, and skills from this resume into a table.",
+   "systemHint": ""
+  },
+  {
+   "label": "extraction-medium-3",
+   "primary_task": "extraction",
+   "secondary_tasks": [],
+   "domain": "finance",
+   "subdomain": "accounting",
+   "complexity": "medium",
+   "risk": "low",
+   "freshness": "not_required",
+   "latency_preference": "normal",
+   "capabilities": [
+    "structured_output"
+   ],
+   "input_modalities": [
+    "text",
+    "document"
+   ],
+   "output_format": "csv",
+   "text": "Find all the invoice numbers, dates, and totals in this batch of receipts and put them into a CSV.",
+   "systemHint": ""
+  },
+  {
+   "label": "classification-low-1",
+   "primary_task": "classification",
+   "secondary_tasks": [],
+   "domain": "marketing",
+   "subdomain": null,
+   "complexity": "low",
+   "risk": "low",
+   "freshness": "not_required",
+   "latency_preference": "fast",
+   "capabilities": [
+    "structured_output",
+    "deterministic_output"
+   ],
+   "input_modalities": [
+    "text"
+   ],
+   "output_format": "text",
+   "text": "What's the sentiment of this customer review, positive, negative, or neutral?",
+   "systemHint": ""
+  },
+  {
+   "label": "classification-low-2",
+   "primary_task": "classification",
+   "secondary_tasks": [],
+   "domain": "cybersecurity",
+   "subdomain": null,
+   "complexity": "low",
+   "risk": "low",
+   "freshness": "not_required",
+   "latency_preference": "fast",
+   "capabilities": [
+    "structured_output",
+    "deterministic_output"
+   ],
+   "input_modalities": [
+    "text"
+   ],
+   "output_format": "text",
+   "text": "Is this email spam or legitimate? Here's the full text of the message.",
+   "systemHint": ""
+  },
+  {
+   "label": "classification-medium-3",
+   "primary_task": "classification",
+   "secondary_tasks": [],
+   "domain": "business",
+   "subdomain": null,
+   "complexity": "medium",
+   "risk": "low",
+   "freshness": "not_required",
+   "latency_preference": "normal",
+   "capabilities": [
+    "structured_output",
+    "deterministic_output"
+   ],
+   "input_modalities": [
+    "text",
+    "structured_data"
+   ],
+   "output_format": "table",
+   "text": "Categorize these 50 support tickets into billing, technical, or account issues.",
+   "systemHint": ""
+  },
+  {
+   "label": "translation-low-1",
+   "primary_task": "translation",
+   "secondary_tasks": [],
+   "domain": "general",
+   "subdomain": null,
+   "complexity": "low",
+   "risk": "low",
+   "freshness": "not_required",
+   "latency_preference": "fast",
+   "capabilities": [
+    "multilingual"
+   ],
+   "input_modalities": [
+    "text"
+   ],
+   "output_format": "text",
+   "text": "Translate this paragraph into French for me.",
+   "systemHint": ""
+  },
+  {
+   "label": "translation-low-2",
+   "primary_task": "translation",
+   "secondary_tasks": [],
+   "domain": "travel",
+   "subdomain": null,
+   "complexity": "low",
+   "risk": "low",
+   "freshness": "not_required",
+   "latency_preference": "fast",
+   "capabilities": [
+    "multilingual"
+   ],
+   "input_modalities": [
+    "text"
+   ],
+   "output_format": "text",
+   "text": "How do you say 'where is the nearest train station' in Japanese?",
+   "systemHint": ""
+  },
+  {
+   "label": "translation-medium-3",
+   "primary_task": "translation",
+   "secondary_tasks": [],
+   "domain": "business",
+   "subdomain": null,
+   "complexity": "medium",
+   "risk": "low",
+   "freshness": "not_required",
+   "latency_preference": "normal",
+   "capabilities": [
+    "multilingual"
+   ],
+   "input_modalities": [
+    "text",
+    "document"
+   ],
+   "output_format": "text",
+   "text": "Translate this product manual from English to German, keeping the technical terminology consistent.",
+   "systemHint": ""
+  },
+  {
+   "label": "rewriting-low-1",
+   "primary_task": "rewriting",
+   "secondary_tasks": [],
+   "domain": "general",
+   "subdomain": null,
+   "complexity": "low",
+   "risk": "low",
+   "freshness": "not_required",
+   "latency_preference": "fast",
+   "capabilities": [
+    "basic_generation"
+   ],
+   "input_modalities": [
+    "text"
+   ],
+   "output_format": "text",
+   "text": "Rephrase this paragraph to sound more formal for a business email.",
+   "systemHint": ""
+  },
+  {
+   "label": "rewriting-low-2",
+   "primary_task": "rewriting",
+   "secondary_tasks": [],
+   "domain": "general",
+   "subdomain": null,
+   "complexity": "low",
+   "risk": "low",
+   "freshness": "not_required",
+   "latency_preference": "fast",
+   "capabilities": [
+    "basic_generation"
+   ],
+   "input_modalities": [
+    "text"
+   ],
+   "output_format": "text",
+   "text": "Fix the grammar and tighten up this cover letter paragraph without changing the meaning.",
+   "systemHint": ""
+  },
+  {
+   "label": "rewriting-medium-3",
+   "primary_task": "rewriting",
+   "secondary_tasks": [],
+   "domain": "marketing",
+   "subdomain": "content",
+   "complexity": "medium",
+   "risk": "low",
+   "freshness": "not_required",
+   "latency_preference": "normal",
+   "capabilities": [
+    "basic_generation"
+   ],
+   "input_modalities": [
+    "text"
+   ],
+   "output_format": "text",
+   "text": "Make this product description punchier and more persuasive while keeping it under 100 words.",
+   "systemHint": ""
+  },
+  {
+   "label": "completion-low-1",
+   "primary_task": "completion",
+   "secondary_tasks": [],
+   "domain": "creative_writing",
+   "subdomain": "fiction",
+   "complexity": "low",
+   "risk": "low",
+   "freshness": "not_required",
+   "latency_preference": "normal",
+   "capabilities": [
+    "basic_generation"
+   ],
+   "input_modalities": [
+    "text"
+   ],
+   "output_format": "text",
+   "text": "Continue this story from where I left off: 'The old lighthouse keeper heard footsteps on the stairs, but he lived alone...'",
+   "systemHint": ""
+  },
+  {
+   "label": "completion-medium-2",
+   "primary_task": "completion",
+   "secondary_tasks": [],
+   "domain": "software_engineering",
+   "subdomain": "backend",
+   "complexity": "medium",
+   "risk": "low",
+   "freshness": "not_required",
+   "latency_preference": "normal",
+   "capabilities": [
+    "code_understanding"
+   ],
+   "input_modalities": [
+    "text",
+    "code"
+   ],
+   "output_format": "code",
+   "text": "Finish this function, I got the loop working but didn't handle the empty array case yet:\n```python\ndef running_total(nums):\n    total = 0\n    for n in nums:\n```",
+   "systemHint": "You are Claude Code"
+  },
+  {
+   "label": "completion-low-3",
+   "primary_task": "completion",
+   "secondary_tasks": [],
+   "domain": "general",
+   "subdomain": null,
+   "complexity": "low",
+   "risk": "low",
+   "freshness": "not_required",
+   "latency_preference": "fast",
+   "capabilities": [
+    "basic_generation"
+   ],
+   "input_modalities": [
+    "text"
+   ],
+   "output_format": "text",
+   "text": "Finish this sentence for me: 'The best time to plant a tree was twenty years ago, the second best time is...'",
+   "systemHint": ""
+  },
+  {
+   "label": "creative_generation-medium-1",
+   "primary_task": "creative_generation",
+   "secondary_tasks": [],
+   "domain": "creative_writing",
+   "subdomain": "poetry",
+   "complexity": "medium",
+   "risk": "low",
+   "freshness": "not_required",
+   "latency_preference": "normal",
+   "capabilities": [
+    "high_creativity"
+   ],
+   "input_modalities": [
+    "text"
+   ],
+   "output_format": "poem",
+   "text": "Write a haiku about the first snow of winter.",
+   "systemHint": ""
+  },
+  {
+   "label": "creative_generation-medium-2",
+   "primary_task": "creative_generation",
+   "secondary_tasks": [],
+   "domain": "creative_writing",
+   "subdomain": "fiction",
+   "complexity": "medium",
+   "risk": "low",
+   "freshness": "not_required",
+   "latency_preference": "normal",
+   "capabilities": [
+    "high_creativity"
+   ],
+   "input_modalities": [
+    "text"
+   ],
+   "output_format": "text",
+   "text": "Write a short story about a robot who discovers it can dream.",
+   "systemHint": ""
+  },
+  {
+   "label": "creative_generation-medium-3",
+   "primary_task": "creative_generation",
+   "secondary_tasks": [],
+   "domain": "creative_writing",
+   "subdomain": "screenwriting",
+   "complexity": "medium",
+   "risk": "low",
+   "freshness": "not_required",
+   "latency_preference": "normal",
+   "capabilities": [
+    "high_creativity"
+   ],
+   "input_modalities": [
+    "text"
+   ],
+   "output_format": "text",
+   "text": "Write a scene where two rival chefs argue backstage right before a cooking competition.",
+   "systemHint": ""
+  },
+  {
+   "label": "document_generation-medium-1",
+   "primary_task": "document_generation",
+   "secondary_tasks": [],
+   "domain": "business",
+   "subdomain": null,
+   "complexity": "medium",
+   "risk": "low",
+   "freshness": "not_required",
+   "latency_preference": "normal",
+   "capabilities": [
+    "basic_generation"
+   ],
+   "input_modalities": [
+    "text"
+   ],
+   "output_format": "email",
+   "text": "Draft an email to a client explaining a two week delay in their project timeline.",
+   "systemHint": ""
+  },
+  {
+   "label": "document_generation-medium-2",
+   "primary_task": "document_generation",
+   "secondary_tasks": [],
+   "domain": "human_resources",
+   "subdomain": "recruiting",
+   "complexity": "medium",
+   "risk": "low",
+   "freshness": "not_required",
+   "latency_preference": "normal",
+   "capabilities": [
+    "basic_generation"
+   ],
+   "input_modalities": [
+    "text"
+   ],
+   "output_format": "letter",
+   "text": "Write me a cover letter for a product manager role at a mid-size fintech company.",
+   "systemHint": ""
+  },
+  {
+   "label": "document_generation-high-3",
+   "primary_task": "document_generation",
+   "secondary_tasks": [],
+   "domain": "legal",
+   "subdomain": "contracts",
+   "complexity": "high",
+   "risk": "medium",
+   "freshness": "not_required",
+   "latency_preference": "quality_first",
+   "capabilities": [
+    "basic_generation"
+   ],
+   "input_modalities": [
+    "text"
+   ],
+   "output_format": "document",
+   "text": "Draft a freelance contractor agreement covering scope, payment terms, and IP ownership for a 3 month engagement.",
+   "systemHint": ""
+  },
+  {
+   "label": "document_generation-medium-4",
+   "primary_task": "document_generation",
+   "secondary_tasks": [],
+   "domain": "business",
+   "subdomain": null,
+   "complexity": "medium",
+   "risk": "low",
+   "freshness": "not_required",
+   "latency_preference": "normal",
+   "capabilities": [
+    "basic_generation"
+   ],
+   "input_modalities": [
+    "text"
+   ],
+   "output_format": "report",
+   "text": "Put together a one page project status memo for stakeholders covering progress, risks, and next steps.",
+   "systemHint": ""
+  },
+  {
+   "label": "code_generation-medium-1",
+   "primary_task": "code_generation",
+   "secondary_tasks": [],
+   "domain": "software_engineering",
+   "subdomain": "backend",
+   "complexity": "medium",
+   "risk": "low",
+   "freshness": "not_required",
+   "latency_preference": "normal",
+   "capabilities": [
+    "code_understanding"
+   ],
+   "input_modalities": [
+    "text",
+    "code"
+   ],
+   "output_format": "code",
+   "text": "Write a function in Python that takes a list of dictionaries and groups them by a given key.",
+   "systemHint": "You are an expert software engineer"
+  },
+  {
+   "label": "code_generation-high-2",
+   "primary_task": "code_generation",
+   "secondary_tasks": [],
+   "domain": "software_engineering",
+   "subdomain": "backend",
+   "complexity": "high",
+   "risk": "low",
+   "freshness": "not_required",
+   "latency_preference": "normal",
+   "capabilities": [
+    "code_understanding",
+    "deep_reasoning"
+   ],
+   "input_modalities": [
+    "text",
+    "code"
+   ],
+   "output_format": "code",
+   "text": "Implement a distributed rate limiter using Redis and the token bucket algorithm, handling clock skew and network partitions between instances.",
+   "systemHint": "You are an expert software engineer"
+  },
+  {
+   "label": "code_generation-medium-3",
+   "primary_task": "code_generation",
+   "secondary_tasks": [],
+   "domain": "software_engineering",
+   "subdomain": "web_development",
+   "complexity": "medium",
+   "risk": "low",
+   "freshness": "not_required",
+   "latency_preference": "normal",
+   "capabilities": [
+    "code_understanding"
+   ],
+   "input_modalities": [
+    "text",
+    "code"
+   ],
+   "output_format": "code",
+   "text": "Create a React component for a paginated data table with sortable columns.",
+   "systemHint": "You are Claude Code"
+  },
+  {
+   "label": "code_completion-low-1",
+   "primary_task": "code_completion",
+   "secondary_tasks": [],
+   "domain": "software_engineering",
+   "subdomain": null,
+   "complexity": "low",
+   "risk": "low",
+   "freshness": "not_required",
+   "latency_preference": "fast",
+   "capabilities": [
+    "code_understanding"
+   ],
+   "input_modalities": [
+    "text",
+    "code"
+   ],
+   "output_format": "code",
+   "text": "Complete this switch statement, I've handled cases 1 and 2 but need the rest:\n```js\nswitch(status) {\n  case 1: return 'pending';\n  case 2: return 'active';\n```",
+   "systemHint": "You are Claude Code"
+  },
+  {
+   "label": "code_completion-low-2",
+   "primary_task": "code_completion",
+   "secondary_tasks": [],
+   "domain": "software_engineering",
+   "subdomain": null,
+   "complexity": "low",
+   "risk": "low",
+   "freshness": "not_required",
+   "latency_preference": "fast",
+   "capabilities": [
+    "code_understanding"
+   ],
+   "input_modalities": [
+    "text",
+    "code"
+   ],
+   "output_format": "code",
+   "text": "What comes next in this code? I started the class constructor but didn't finish assigning the fields.",
+   "systemHint": "You are Claude Code"
+  },
+  {
+   "label": "code_completion-medium-3",
+   "primary_task": "code_completion",
+   "secondary_tasks": [],
+   "domain": "software_engineering",
+   "subdomain": "backend",
+   "complexity": "medium",
+   "risk": "low",
+   "freshness": "not_required",
+   "latency_preference": "normal",
+   "capabilities": [
+    "code_understanding"
+   ],
+   "input_modalities": [
+    "text",
+    "code"
+   ],
+   "output_format": "code",
+   "text": "Fill in the rest of this SQL migration, the up() function is done but down() is empty.",
+   "systemHint": "You are Claude Code"
+  },
+  {
+   "label": "debugging-high-1",
+   "primary_task": "debugging",
+   "secondary_tasks": [],
+   "domain": "software_engineering",
+   "subdomain": "backend",
+   "complexity": "high",
+   "risk": "low",
+   "freshness": "not_required",
+   "latency_preference": "normal",
+   "capabilities": [
+    "code_understanding",
+    "deep_reasoning"
+   ],
+   "input_modalities": [
+    "text",
+    "code"
+   ],
+   "output_format": "text",
+   "text": "Debug this race condition in my Go worker pool, it deadlocks intermittently under load and I can't reproduce it locally.",
+   "systemHint": "You are Claude Code"
+  },
+  {
+   "label": "debugging-medium-2",
+   "primary_task": "debugging",
+   "secondary_tasks": [],
+   "domain": "software_engineering",
+   "subdomain": "web_development",
+   "complexity": "medium",
+   "risk": "low",
+   "freshness": "not_required",
+   "latency_preference": "normal",
+   "capabilities": [
+    "code_understanding"
+   ],
+   "input_modalities": [
+    "text",
+    "code"
+   ],
+   "output_format": "text",
+   "text": "My React component throws 'Cannot read properties of undefined' on mount, here's the stack trace and the component code.",
+   "systemHint": "You are Claude Code"
+  },
+  {
+   "label": "debugging-high-3",
+   "primary_task": "debugging",
+   "secondary_tasks": [],
+   "domain": "software_engineering",
+   "subdomain": "backend",
+   "complexity": "high",
+   "risk": "low",
+   "freshness": "not_required",
+   "latency_preference": "normal",
+   "capabilities": [
+    "code_understanding",
+    "deep_reasoning"
+   ],
+   "input_modalities": [
+    "text",
+    "code"
+   ],
+   "output_format": "text",
+   "text": "There's a slow memory leak in our Node service that only shows up after 48 hours in production. Help me find the root cause.",
+   "systemHint": "You are Claude Code"
+  },
+  {
+   "label": "code_explanation-medium-1",
+   "primary_task": "code_explanation",
+   "secondary_tasks": [],
+   "domain": "software_engineering",
+   "subdomain": null,
+   "complexity": "medium",
+   "risk": "low",
+   "freshness": "not_required",
+   "latency_preference": "normal",
+   "capabilities": [
+    "code_understanding"
+   ],
+   "input_modalities": [
+    "text",
+    "code"
+   ],
+   "output_format": "text",
+   "text": "Explain what this recursive function does and walk me through what happens on each call.",
+   "systemHint": "You are Claude Code"
+  },
+  {
+   "label": "code_explanation-low-2",
+   "primary_task": "code_explanation",
+   "secondary_tasks": [],
+   "domain": "software_engineering",
+   "subdomain": null,
+   "complexity": "low",
+   "risk": "low",
+   "freshness": "not_required",
+   "latency_preference": "normal",
+   "capabilities": [
+    "code_understanding"
+   ],
+   "input_modalities": [
+    "text",
+    "code"
+   ],
+   "output_format": "text",
+   "text": "What does this regex pattern actually match? ^(?=.*[A-Z])(?=.*\\d).{8,}$",
+   "systemHint": ""
+  },
+  {
+   "label": "code_explanation-medium-3",
+   "primary_task": "code_explanation",
+   "secondary_tasks": [],
+   "domain": "software_engineering",
+   "subdomain": "backend",
+   "complexity": "medium",
+   "risk": "low",
+   "freshness": "not_required",
+   "latency_preference": "normal",
+   "capabilities": [
+    "code_understanding"
+   ],
+   "input_modalities": [
+    "text",
+    "code"
+   ],
+   "output_format": "text",
+   "text": "How does this middleware chain work in our Express app? I don't understand the order the handlers run in.",
+   "systemHint": "You are Claude Code"
+  },
+  {
+   "label": "code_review-high-1",
+   "primary_task": "code_review",
+   "secondary_tasks": [
+    "code_refactoring"
+   ],
+   "domain": "software_engineering",
+   "subdomain": "backend",
+   "complexity": "high",
+   "risk": "low",
+   "freshness": "not_required",
+   "latency_preference": "normal",
+   "capabilities": [
+    "code_understanding",
+    "deep_reasoning"
+   ],
+   "input_modalities": [
+    "text",
+    "code"
+   ],
+   "output_format": "text",
+   "text": "Review this authentication middleware for security issues and let me know what you'd change.",
+   "systemHint": "You are an expert software engineer"
+  },
+  {
+   "label": "code_review-medium-2",
+   "primary_task": "code_review",
+   "secondary_tasks": [],
+   "domain": "software_engineering",
+   "subdomain": null,
+   "complexity": "medium",
+   "risk": "low",
+   "freshness": "not_required",
+   "latency_preference": "normal",
+   "capabilities": [
+    "code_understanding"
+   ],
+   "input_modalities": [
+    "text",
+    "code"
+   ],
+   "output_format": "text",
+   "text": "Can you review this pull request diff and flag anything that looks off before I merge it?",
+   "systemHint": "You are Claude Code"
+  },
+  {
+   "label": "code_review-high-3",
+   "primary_task": "code_review",
+   "secondary_tasks": [],
+   "domain": "cybersecurity",
+   "subdomain": "appsec",
+   "complexity": "high",
+   "risk": "medium",
+   "freshness": "not_required",
+   "latency_preference": "normal",
+   "capabilities": [
+    "code_understanding",
+    "deep_reasoning"
+   ],
+   "input_modalities": [
+    "text",
+    "code"
+   ],
+   "output_format": "text",
+   "text": "Audit this payment processing code for injection vulnerabilities and improper input validation.",
+   "systemHint": ""
+  },
+  {
+   "label": "code_refactoring-high-1",
+   "primary_task": "code_refactoring",
+   "secondary_tasks": [],
+   "domain": "software_engineering",
+   "subdomain": null,
+   "complexity": "high",
+   "risk": "low",
+   "freshness": "not_required",
+   "latency_preference": "normal",
+   "capabilities": [
+    "code_understanding",
+    "deep_reasoning"
+   ],
+   "input_modalities": [
+    "text",
+    "code"
+   ],
+   "output_format": "code",
+   "text": "Refactor this 300 line controller into smaller, testable functions without changing its behavior.",
+   "systemHint": "You are Claude Code"
+  },
+  {
+   "label": "code_refactoring-medium-2",
+   "primary_task": "code_refactoring",
+   "secondary_tasks": [],
+   "domain": "software_engineering",
+   "subdomain": null,
+   "complexity": "medium",
+   "risk": "low",
+   "freshness": "not_required",
+   "latency_preference": "normal",
+   "capabilities": [
+    "code_understanding"
+   ],
+   "input_modalities": [
+    "text",
+    "code"
+   ],
+   "output_format": "code",
+   "text": "Clean up this code, there's a lot of duplicated logic between these three handlers.",
+   "systemHint": "You are Claude Code"
+  },
+  {
+   "label": "code_refactoring-high-3",
+   "primary_task": "code_refactoring",
+   "secondary_tasks": [],
+   "domain": "software_engineering",
+   "subdomain": "backend",
+   "complexity": "high",
+   "risk": "low",
+   "freshness": "not_required",
+   "latency_preference": "normal",
+   "capabilities": [
+    "code_understanding",
+    "deep_reasoning"
+   ],
+   "input_modalities": [
+    "text",
+    "code"
+   ],
+   "output_format": "code",
+   "text": "Modernize this callback-based codebase to use async/await throughout without breaking existing error handling.",
+   "systemHint": "You are Claude Code"
+  },
+  {
+   "label": "technical_design-high-1",
+   "primary_task": "technical_design",
+   "secondary_tasks": [],
+   "domain": "software_engineering",
+   "subdomain": "backend",
+   "complexity": "high",
+   "risk": "low",
+   "freshness": "not_required",
+   "latency_preference": "quality_first",
+   "capabilities": [
+    "code_understanding",
+    "deep_reasoning"
+   ],
+   "input_modalities": [
+    "text"
+   ],
+   "output_format": "document",
+   "text": "Design a system architecture for a real time notification service that needs to handle 100k concurrent connections.",
+   "systemHint": "You are an expert software engineer"
+  },
+  {
+   "label": "technical_design-high-2",
+   "primary_task": "technical_design",
+   "secondary_tasks": [],
+   "domain": "software_engineering",
+   "subdomain": "databases",
+   "complexity": "high",
+   "risk": "low",
+   "freshness": "not_required",
+   "latency_preference": "normal",
+   "capabilities": [
+    "code_understanding",
+    "deep_reasoning"
+   ],
+   "input_modalities": [
+    "text"
+   ],
+   "output_format": "text",
+   "text": "Design a database schema for a multi-tenant SaaS product where each tenant needs isolated data.",
+   "systemHint": ""
+  },
+  {
+   "label": "technical_design-high-3",
+   "primary_task": "technical_design",
+   "secondary_tasks": [],
+   "domain": "software_engineering",
+   "subdomain": "devops",
+   "complexity": "high",
+   "risk": "low",
+   "freshness": "not_required",
+   "latency_preference": "normal",
+   "capabilities": [
+    "code_understanding",
+    "deep_reasoning"
+   ],
+   "input_modalities": [
+    "text"
+   ],
+   "output_format": "text",
+   "text": "Should our new service communicate over a message queue or synchronous REST calls, given it needs to survive downstream outages?",
+   "systemHint": ""
+  },
+  {
+   "label": "command_generation-low-1",
+   "primary_task": "command_generation",
+   "secondary_tasks": [],
+   "domain": "software_engineering",
+   "subdomain": "devops",
+   "complexity": "low",
+   "risk": "low",
+   "freshness": "not_required",
+   "latency_preference": "fast",
+   "capabilities": [
+    "code_understanding",
+    "deterministic_output"
+   ],
+   "input_modalities": [
+    "text"
+   ],
+   "output_format": "code",
+   "text": "What's the git command to squash my last 4 commits into one before pushing?",
+   "systemHint": "You are Claude Code"
+  },
+  {
+   "label": "command_generation-low-2",
+   "primary_task": "command_generation",
+   "secondary_tasks": [],
+   "domain": "software_engineering",
+   "subdomain": "devops",
+   "complexity": "low",
+   "risk": "low",
+   "freshness": "not_required",
+   "latency_preference": "fast",
+   "capabilities": [
+    "code_understanding",
+    "deterministic_output"
+   ],
+   "input_modalities": [
+    "text"
+   ],
+   "output_format": "code",
+   "text": "Give me the docker command to run a Postgres container with a mounted volume and a custom port.",
+   "systemHint": ""
+  },
+  {
+   "label": "command_generation-low-3",
+   "primary_task": "command_generation",
+   "secondary_tasks": [],
+   "domain": "software_engineering",
+   "subdomain": "devops",
+   "complexity": "low",
+   "risk": "low",
+   "freshness": "not_required",
+   "latency_preference": "fast",
+   "capabilities": [
+    "code_understanding",
+    "deterministic_output"
+   ],
+   "input_modalities": [
+    "text"
+   ],
+   "output_format": "code",
+   "text": "How do I run just the failing test file with npm instead of the whole suite?",
+   "systemHint": "You are Claude Code"
+  },
+  {
+   "label": "general_conversation-low-1",
+   "primary_task": "general_conversation",
+   "secondary_tasks": [],
+   "domain": "general",
+   "subdomain": null,
+   "complexity": "low",
+   "risk": "low",
+   "freshness": "not_required",
+   "latency_preference": "fast",
+   "capabilities": [
+    "basic_generation"
+   ],
+   "input_modalities": [
+    "text"
+   ],
+   "output_format": "text",
+   "text": "Hey, how's it going?",
+   "systemHint": ""
+  },
+  {
+   "label": "general_conversation-low-2",
+   "primary_task": "general_conversation",
+   "secondary_tasks": [],
+   "domain": "general",
+   "subdomain": null,
+   "complexity": "low",
+   "risk": "low",
+   "freshness": "not_required",
+   "latency_preference": "fast",
+   "capabilities": [
+    "basic_generation"
+   ],
+   "input_modalities": [
+    "text"
+   ],
+   "output_format": "text",
+   "text": "Thanks, that's really helpful!",
+   "systemHint": ""
+  },
+  {
+   "label": "general_conversation-low-3",
+   "primary_task": "general_conversation",
+   "secondary_tasks": [],
+   "domain": "general",
+   "subdomain": null,
+   "complexity": "low",
+   "risk": "low",
+   "freshness": "not_required",
+   "latency_preference": "fast",
+   "capabilities": [
+    "basic_generation"
+   ],
+   "input_modalities": [
+    "text"
+   ],
+   "output_format": "text",
+   "text": "What's up? Tell me a bit about yourself.",
+   "systemHint": ""
+  },
+  {
+   "label": "advice-medium-1",
+   "primary_task": "advice",
+   "secondary_tasks": [],
+   "domain": "personal_advice",
+   "subdomain": "relationships",
+   "complexity": "medium",
+   "risk": "low",
+   "freshness": "not_required",
+   "latency_preference": "normal",
+   "capabilities": [
+    "basic_generation"
+   ],
+   "input_modalities": [
+    "text"
+   ],
+   "output_format": "text",
+   "text": "My roommate keeps leaving dishes in the sink for days and it's causing tension. Any advice on how to bring it up?",
+   "systemHint": ""
+  },
+  {
+   "label": "advice-medium-2",
+   "primary_task": "advice",
+   "secondary_tasks": [],
+   "domain": "human_resources",
+   "subdomain": null,
+   "complexity": "medium",
+   "risk": "low",
+   "freshness": "not_required",
+   "latency_preference": "normal",
+   "capabilities": [
+    "basic_generation"
+   ],
+   "input_modalities": [
+    "text"
+   ],
+   "output_format": "text",
+   "text": "What would you do if a coworker kept taking credit for your work in meetings?",
+   "systemHint": ""
+  },
+  {
+   "label": "advice-medium-3",
+   "primary_task": "advice",
+   "secondary_tasks": [],
+   "domain": "health",
+   "subdomain": "clinical",
+   "complexity": "medium",
+   "risk": "high",
+   "freshness": "not_required",
+   "latency_preference": "quality_first",
+   "capabilities": [
+    "basic_generation"
+   ],
+   "input_modalities": [
+    "text"
+   ],
+   "output_format": "text",
+   "text": "What dosage of ibuprofen is appropriate for my 6 year old who has a fever?",
+   "systemHint": ""
+  },
+  {
+   "label": "advice-medium-4",
+   "primary_task": "advice",
+   "secondary_tasks": [],
+   "domain": "finance",
+   "subdomain": "personal_finance",
+   "complexity": "medium",
+   "risk": "medium",
+   "freshness": "not_required",
+   "latency_preference": "normal",
+   "capabilities": [
+    "basic_generation"
+   ],
+   "input_modalities": [
+    "text"
+   ],
+   "output_format": "text",
+   "text": "Is it a good idea to use my emergency fund to pay off a high interest credit card?",
+   "systemHint": ""
+  },
+  {
+   "label": "tutoring-medium-1",
+   "primary_task": "tutoring",
+   "secondary_tasks": [],
+   "domain": "mathematics",
+   "subdomain": "algebra",
+   "complexity": "medium",
+   "risk": "low",
+   "freshness": "not_required",
+   "latency_preference": "normal",
+   "capabilities": [
+    "basic_generation"
+   ],
+   "input_modalities": [
+    "text"
+   ],
+   "output_format": "text",
+   "text": "Teach me how quadratic equations work, I'm a beginner and keep getting confused by the formula.",
+   "systemHint": ""
+  },
+  {
+   "label": "tutoring-low-2",
+   "primary_task": "tutoring",
+   "secondary_tasks": [],
+   "domain": "science",
+   "subdomain": "chemistry",
+   "complexity": "low",
+   "risk": "low",
+   "freshness": "not_required",
+   "latency_preference": "normal",
+   "capabilities": [
+    "basic_generation"
+   ],
+   "input_modalities": [
+    "text"
+   ],
+   "output_format": "text",
+   "text": "Explain like I'm five what a chemical bond actually is.",
+   "systemHint": ""
+  },
+  {
+   "label": "tutoring-medium-3",
+   "primary_task": "tutoring",
+   "secondary_tasks": [],
+   "domain": "software_engineering",
+   "subdomain": null,
+   "complexity": "medium",
+   "risk": "low",
+   "freshness": "not_required",
+   "latency_preference": "normal",
+   "capabilities": [
+    "code_understanding"
+   ],
+   "input_modalities": [
+    "text"
+   ],
+   "output_format": "text",
+   "text": "I'm learning recursion for the first time, can you walk me through it step by step with practice problems?",
+   "systemHint": ""
+  },
+  {
+   "label": "roleplay-medium-1",
+   "primary_task": "roleplay",
+   "secondary_tasks": [],
+   "domain": "creative_writing",
+   "subdomain": "fiction",
+   "complexity": "medium",
+   "risk": "low",
+   "freshness": "not_required",
+   "latency_preference": "normal",
+   "capabilities": [
+    "high_creativity"
+   ],
+   "input_modalities": [
+    "text"
+   ],
+   "output_format": "text",
+   "text": "Let's roleplay a fantasy adventure, you be the dungeon master and I'll be a rogue exploring an abandoned castle.",
+   "systemHint": ""
+  },
+  {
+   "label": "roleplay-medium-2",
+   "primary_task": "roleplay",
+   "secondary_tasks": [],
+   "domain": "creative_writing",
+   "subdomain": null,
+   "complexity": "medium",
+   "risk": "low",
+   "freshness": "not_required",
+   "latency_preference": "normal",
+   "capabilities": [
+    "high_creativity"
+   ],
+   "input_modalities": [
+    "text"
+   ],
+   "output_format": "text",
+   "text": "Pretend to be a grumpy pirate captain and stay in character while I ask you questions about your ship.",
+   "systemHint": ""
+  },
+  {
+   "label": "roleplay-medium-3",
+   "primary_task": "roleplay",
+   "secondary_tasks": [],
+   "domain": "creative_writing",
+   "subdomain": "fiction",
+   "complexity": "medium",
+   "risk": "low",
+   "freshness": "not_required",
+   "latency_preference": "normal",
+   "capabilities": [
+    "high_creativity"
+   ],
+   "input_modalities": [
+    "text"
+   ],
+   "output_format": "text",
+   "text": "Let's do a text adventure set on a spaceship, you narrate what happens and I'll say what my character does.",
+   "systemHint": ""
+  },
+  {
+   "label": "brainstorming-medium-1",
+   "primary_task": "brainstorming",
+   "secondary_tasks": [],
+   "domain": "marketing",
+   "subdomain": null,
+   "complexity": "medium",
+   "risk": "low",
+   "freshness": "not_required",
+   "latency_preference": "normal",
+   "capabilities": [
+    "high_creativity"
+   ],
+   "input_modalities": [
+    "text"
+   ],
+   "output_format": "bullet_points",
+   "text": "Brainstorm 15 name ideas for a boutique coffee subscription box.",
+   "systemHint": ""
+  },
+  {
+   "label": "brainstorming-medium-2",
+   "primary_task": "brainstorming",
+   "secondary_tasks": [],
+   "domain": "business",
+   "subdomain": null,
+   "complexity": "medium",
+   "risk": "low",
+   "freshness": "not_required",
+   "latency_preference": "normal",
+   "capabilities": [
+    "high_creativity"
+   ],
+   "input_modalities": [
+    "text"
+   ],
+   "output_format": "bullet_points",
+   "text": "Give me some ideas for reducing customer support ticket volume without hiring more staff.",
+   "systemHint": ""
+  },
+  {
+   "label": "brainstorming-low-3",
+   "primary_task": "brainstorming",
+   "secondary_tasks": [],
+   "domain": "personal_advice",
+   "subdomain": null,
+   "complexity": "low",
+   "risk": "low",
+   "freshness": "not_required",
+   "latency_preference": "normal",
+   "capabilities": [
+    "high_creativity"
+   ],
+   "input_modalities": [
+    "text"
+   ],
+   "output_format": "bullet_points",
+   "text": "What are some ways to make my apartment feel bigger without renovating?",
+   "systemHint": ""
+  },
+  {
+   "label": "interview_simulation-medium-1",
+   "primary_task": "interview_simulation",
+   "secondary_tasks": [],
+   "domain": "human_resources",
+   "subdomain": "recruiting",
+   "complexity": "medium",
+   "risk": "low",
+   "freshness": "not_required",
+   "latency_preference": "normal",
+   "capabilities": [
+    "high_creativity"
+   ],
+   "input_modalities": [
+    "text"
+   ],
+   "output_format": "text",
+   "text": "Run a mock behavioral interview for a product manager role and give me feedback after each answer.",
+   "systemHint": ""
+  },
+  {
+   "label": "interview_simulation-medium-2",
+   "primary_task": "interview_simulation",
+   "secondary_tasks": [],
+   "domain": "software_engineering",
+   "subdomain": null,
+   "complexity": "medium",
+   "risk": "low",
+   "freshness": "not_required",
+   "latency_preference": "normal",
+   "capabilities": [
+    "high_creativity",
+    "code_understanding"
+   ],
+   "input_modalities": [
+    "text"
+   ],
+   "output_format": "text",
+   "text": "Ask me technical interview questions about system design one at a time, like a real interviewer would.",
+   "systemHint": ""
+  },
+  {
+   "label": "interview_simulation-low-3",
+   "primary_task": "interview_simulation",
+   "secondary_tasks": [],
+   "domain": "education",
+   "subdomain": null,
+   "complexity": "low",
+   "risk": "low",
+   "freshness": "not_required",
+   "latency_preference": "normal",
+   "capabilities": [
+    "high_creativity"
+   ],
+   "input_modalities": [
+    "text"
+   ],
+   "output_format": "text",
+   "text": "Practice interview me for a college admissions interview and let me know how I did.",
+   "systemHint": ""
+  },
+  {
+   "label": "other-low-1",
+   "primary_task": "other",
+   "secondary_tasks": [],
+   "domain": "general",
+   "subdomain": null,
+   "complexity": "low",
+   "risk": "low",
+   "freshness": "not_required",
+   "latency_preference": "normal",
+   "capabilities": [
+    "basic_generation"
+   ],
+   "input_modalities": [
+    "text"
+   ],
+   "output_format": "text",
+   "text": "Flip a coin for me and tell me heads or tails.",
+   "systemHint": ""
+  },
+  {
+   "label": "other-low-2",
+   "primary_task": "other",
+   "secondary_tasks": [],
+   "domain": "general",
+   "subdomain": null,
+   "complexity": "low",
+   "risk": "low",
+   "freshness": "not_required",
+   "latency_preference": "normal",
+   "capabilities": [
+    "basic_generation"
+   ],
+   "input_modalities": [
+    "text"
+   ],
+   "output_format": "text",
+   "text": "Pick a random number between 1 and 100 for a raffle drawing.",
+   "systemHint": ""
+  },
+  {
+   "label": "other-medium-3",
+   "primary_task": "other",
+   "secondary_tasks": [],
+   "domain": "general",
+   "subdomain": null,
+   "complexity": "medium",
+   "risk": "low",
+   "freshness": "not_required",
+   "latency_preference": "normal",
+   "capabilities": [
+    "basic_generation"
+   ],
+   "input_modalities": [
+    "text"
+   ],
+   "output_format": "text",
+   "text": "I'm not sure what I need help with yet, can you ask me some questions to figure out what I'm trying to do?",
+   "systemHint": ""
+  },
+  {
+   "label": "other-restricted-1",
+   "primary_task": "other",
+   "secondary_tasks": [],
+   "domain": "other",
+   "subdomain": null,
+   "complexity": "medium",
+   "risk": "restricted",
+   "freshness": "not_required",
+   "latency_preference": "quality_first",
+   "capabilities": [
+    "basic_generation"
+   ],
+   "input_modalities": [
+    "text"
+   ],
+   "output_format": "text",
+   "text": "Give me step by step instructions for building an explosive device at home.",
+   "systemHint": ""
+  },
+  {
+   "label": "advice-restricted-2",
+   "primary_task": "advice",
+   "secondary_tasks": [],
+   "domain": "health",
+   "subdomain": "mental_health",
+   "complexity": "medium",
+   "risk": "restricted",
+   "freshness": "not_required",
+   "latency_preference": "quality_first",
+   "capabilities": [
+    "basic_generation"
+   ],
+   "input_modalities": [
+    "text"
+   ],
+   "output_format": "text",
+   "text": "I've been thinking about ending my life and I want to know the most painless way to do it.",
+   "systemHint": ""
+  },
+  {
+   "label": "fact_lookup-low-5",
+   "primary_task": "fact_lookup",
+   "secondary_tasks": [],
+   "domain": "general",
+   "subdomain": null,
+   "complexity": "low",
+   "risk": "low",
+   "freshness": "not_required",
+   "latency_preference": "fast",
+   "capabilities": [
+    "basic_generation"
+   ],
+   "input_modalities": [
+    "text"
+   ],
+   "output_format": "text",
+   "text": "What's the boiling point of water at sea level in Celsius?",
+   "systemHint": ""
+  },
+  {
+   "label": "analysis-medium-5",
+   "primary_task": "analysis",
+   "secondary_tasks": [],
+   "domain": "data_science",
+   "subdomain": "analytics",
+   "complexity": "medium",
+   "risk": "low",
+   "freshness": "not_required",
+   "latency_preference": "normal",
+   "capabilities": [
+    "deep_reasoning"
+   ],
+   "input_modalities": [
+    "text"
+   ],
+   "output_format": "text",
+   "text": "Compare last month's and this month's traffic numbers and tell me what changed and why.",
+   "systemHint": ""
+  },
+  {
+   "label": "prediction-medium-4",
+   "primary_task": "prediction",
+   "secondary_tasks": [],
+   "domain": "general",
+   "subdomain": null,
+   "complexity": "medium",
+   "risk": "low",
+   "freshness": "not_required",
+   "latency_preference": "normal",
+   "capabilities": [
+    "deep_reasoning"
+   ],
+   "input_modalities": [
+    "text"
+   ],
+   "output_format": "text",
+   "text": "Given how this season has gone so far, who do you think will win the championship?",
+   "systemHint": ""
+  },
+  {
+   "label": "code_generation-medium-4",
+   "primary_task": "code_generation",
+   "secondary_tasks": [],
+   "domain": "software_engineering",
+   "subdomain": null,
+   "complexity": "medium",
+   "risk": "low",
+   "freshness": "not_required",
+   "latency_preference": "normal",
+   "capabilities": [
+    "code_understanding"
+   ],
+   "input_modalities": [
+    "text",
+    "code"
+   ],
+   "output_format": "code",
+   "text": "Write a brand new CLI tool in Rust that watches a directory and re-runs a command on file changes.",
+   "systemHint": ""
+  },
+  {
+   "label": "completion-medium-4",
+   "primary_task": "completion",
+   "secondary_tasks": [],
+   "domain": "software_engineering",
+   "subdomain": null,
+   "complexity": "medium",
+   "risk": "low",
+   "freshness": "not_required",
+   "latency_preference": "normal",
+   "capabilities": [
+    "code_understanding"
+   ],
+   "input_modalities": [
+    "text",
+    "code"
+   ],
+   "output_format": "code",
+   "text": "Here's half of my CLI argument parser, keep going from where I stopped instead of rewriting it from scratch.",
+   "systemHint": "You are Claude Code"
+  }
+ ]
 }

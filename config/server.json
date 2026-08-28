@@ -3,7 +3,7 @@
     "mode": "auto",
     "cacheHours": 1,
     "cacheMaxEntries": 2000,
-    "llmClassifierModel": "deepseek-v4-flash",
+    "llmClassifierModel": "deepseek-chat",
 
     "fusionConfidenceThreshold": 0.65,
 
@@ -15,7 +15,7 @@
     },
 
     "embedding": {
-      "minSimilarity": 0.15,
+      "minSimilarity": 0.25,
       "topK": 3
     },
 
@@ -23,13 +23,15 @@
       "lowCharCount": 500,
       "highCharCount": 12000,
       "deepConversation": 8,
-      "longSystemPrompt": 3000
+      "longSystemPrompt": 3000,
+      "largeInputChars": 20000
     }
   },
   "router": {
     "costWeight": 0.3,
     "qualityWeight": 0.7,
     "fallbackModel": "deepseek-v4-flash",
-    "providerFallbackChain": ["deepseek-v4-flash", "deepseek-chat", "deepseek-reasoner", "deepseek-v4-pro"]
+    "providerFallbackChain": ["deepseek-v4-flash", "deepseek-chat", "deepseek-reasoner", "deepseek-v4-pro"],
+    "defaultMode": "cheap"
   }
 }

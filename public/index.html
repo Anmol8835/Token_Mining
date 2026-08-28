@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Router Metrics — LLM Proxy</title>
+<style>
+  /* ----------------------------------------------------------
+     Palette roles — dark mode (validated reference palette)
+     ---------------------------------------------------------- */
+  :root {
+    color-scheme: dark;
+    --surface-1: #1a1a19;      /* chart surface */
+    --page: #0d0d0d;           /* page plane */
+    --text-primary: #ffffff;
+    --text-secondary: #c3c2b7;
+    --muted: #898781;
+    --gridline: #2c2c2a;
+    --baseline: #383835;
+    --border: rgba(255,255,255,0.10);
+
+    /* Categorical slots (fixed order — never cycled) */
+    --series-1: #3987e5;  --series-2: #d95926;
+    --series-3: #199e70;  --series-4: #c98500;
+    --series-5: #d55181;  --series-6: #008300;
+    --series-7: #9085e9;  --series-8: #e66767;
+
+    /* Status (risk only — never reused as series colors) */
+    --status-good: #0ca30c;
+    --status-warning: #fab219;
+    --status-serious: #ec835a;
+    --status-critical: #d03b3b;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--page);
+    color: var(--text-primary);
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+    font-size: 14px;
+    line-height: 1.45;
+  }
+
+  .wrap { max-width: 1280px; margin: 0 auto; padding: 20px 24px 60px; }
+
+  header.top {
+    display: flex; align-items: baseline; gap: 16px; flex-wrap: wrap;
+    margin-bottom: 4px;
+  }
+  header.top h1 { font-size: 20px; margin: 0; font-weight: 650; }
+  header.top .sub { color: var(--text-secondary); font-size: 13px; }
+
+  .controls {
+    display: flex; gap: 10px; align-items: center; flex-wrap: wrap;
+    margin: 14px 0 18px;
+  }
+  button {
+    background: var(--surface-1);
+    color: var(--text-primary);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 6px 14px;
+    font: inherit; font-size: 13px;
+    cursor: pointer;
+  }
+  button:hover { border-color: var(--muted); }
+  button.active { border-color: var(--series-1); color: var(--series-1); }
+  .conn { font-size: 12px; color: var(--muted); display: flex; gap: 6px; align-items: center; }
+  .conn .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--status-critical); }
+  .conn.live .dot { background: var(--status-good); }
+
+  /* KPI tiles */
+  .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-bottom: 18px; }
+  .kpi {
+    background: var(--surface-1);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px 16px;
+  }
+  .kpi .label { font-size: 12px; color: var(--text-secondary); }
+  .kpi .value { font-size: 26px; font-weight: 650; margin-top: 2px; }
+  .kpi .hint { font-size: 12px; color: var(--muted); margin-top: 2px; }
+
+  /* Panels */
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(380px, 1fr)); gap: 12px; }
+  .panel {
+    background: var(--surface-1);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px 16px;
+    min-width: 0;
+  }
+  .panel h2 { font-size: 13px; margin: 0 0 10px; color: var(--text-secondary); font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; }
+  .panel.wide { grid-column: 1 / -1; }
+
+  /* Bar rows */
+  .bars { display: flex; flex-direction: column; gap: 7px; }
+  .bar-row { display: grid; grid-template-columns: 150px 1fr 54px; gap: 10px; align-items: center; }
+  .bar-row .name {
+    font-size: 12px; color: var(--text-secondary);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .bar-track { background: var(--gridline); border-radius: 4px; height: 10px; overflow: hidden; }
+  .bar-fill { height: 100%; border-radius: 0 4px 4px 0; }
+  .bar-row .val { font-size: 12px; color: var(--text-primary); text-align: right; font-variant-numeric: tabular-nums; }
+  .bar-row .val.muted { color: var(--muted); }
+  .legend { display: flex; gap: 14px; flex-wrap: wrap; margin-bottom: 10px; }
+  .legend span { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-secondary); }
+  .legend i { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
+  .empty { color: var(--muted); font-size: 13px; padding: 12px 0; }
+
+  /* Latest classification detail */
+  .detail dl {
+    display: grid; grid-template-columns: auto 1fr; gap: 4px 18px; margin: 0;
+    font-size: 13px;
+  }
+  .detail dt { color: var(--text-secondary); }
+  .detail dd { margin: 0; text-align: right; font-variant-numeric: tabular-nums; word-break: break-word; }
+
+  .badges { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+  .badge {
+    font-size: 11px; border-radius: 999px; padding: 2px 9px;
+    border: 1px solid var(--border); color: var(--text-secondary);
+  }
+  .badge.review { color: #fff; background: var(--status-critical); border-color: var(--status-critical); }
+
+  /* Risk chips — status palette + label, never color alone */
+  .risk { display: inline-flex; align-items: center; gap: 5px; }
+  .risk i { width: 8px; height: 8px; border-radius: 50%; }
+  .risk.low i { background: var(--status-good); }
+  .risk.medium i { background: var(--status-warning); }
+  .risk.high i { background: var(--status-serious); }
+  .risk.restricted i { background: var(--status-critical); }
+
+  /* Tables */
+  table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+  th {
+    text-align: left; color: var(--text-secondary); font-weight: 600;
+    padding: 6px 8px; border-bottom: 1px solid var(--baseline);
+    position: sticky; top: 0; background: var(--surface-1);
+  }
+  td {
+    padding: 6px 8px; border-bottom: 1px solid var(--gridline);
+    color: var(--text-secondary);
+  }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  td strong { color: var(--text-primary); font-weight: 600; }
+  tr:hover td { background: rgba(255,255,255,0.03); }
+  .table-scroll { max-height: 420px; overflow: auto; }
+
+  /* Candidate scores */
+  .cand-row { display: grid; grid-template-columns: 140px 1fr 70px; gap: 10px; align-items: center; padding: 2px 0; }
+  .cand-row.winner .name { color: var(--text-primary); font-weight: 650; }
+  .cand-row.winner .val { color: var(--series-3); font-weight: 650; }
+  .cand-row .name { font-size: 12px; color: var(--text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .cand-row .val { font-size: 12px; text-align: right; font-variant-numeric: tabular-nums; color: var(--muted); }
+  .cand-row .bar-track { height: 8px; }
+  .cand-row .bar-fill.win { background: var(--series-3); }
+  .cand-row .bar-fill.lose { background: var(--muted); opacity: 0.55; }
+
+  @media (max-width: 720px) {
+    .bar-row { grid-template-columns: 110px 1fr 44px; }
+    .cand-row { grid-template-columns: 110px 1fr 56px; }
+    .detail dd { text-align: left; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="top">
+    <h1>LLM Proxy — Routing Metrics</h1>
+    <span class="sub">classifier → fusion → router → provider</span>
+  </header>
+
+  <div class="controls">
+    <button id="btnDemo" title="Run 12 varied prompts through the real classifier and router">▶ Generate demo traffic</button>
+    <button id="btnReset" title="Clear all recorded metrics">Reset</button>
+    <button id="btnPause" title="Pause polling">⏸ Pause</button>
+    <span class="conn" id="conn"><span class="dot"></span><span id="connText">connecting…</span></span>
+    <span class="sub" id="uptime"></span>
+  </div>
+
+  <div class="kpis">
+    <div class="kpi"><div class="label">Requests</div><div class="value" id="kRequests">–</div><div class="hint" id="kFallbacks">0 provider fallbacks</div></div>
+    <div class="kpi"><div class="label">Avg total latency</div><div class="value" id="kLatency">–</div><div class="hint" id="kClassifier">classifier 0 ms</div></div>
+    <div class="kpi"><div class="label">Est. total cost</div><div class="value" id="kCost">–</div><div class="hint" id="kTokens">0 in / 0 out tokens</div></div>
+    <div class="kpi"><div class="label">Avg confidence</div><div class="value" id="kConf">–</div><div class="hint" id="kReview">0 review flags</div></div>
+  </div>
+
+  <div class="grid">
+    <div class="panel">
+      <h2>Requests by primary task</h2>
+      <div id="taskChart" class="bars"><div class="empty">no data yet — send requests or generate demo traffic</div></div>
+    </div>
+
+    <div class="panel">
+      <h2>Model usage <span class="sub" style="text-transform:none">(requests · est. cost)</span></h2>
+      <div id="modelChart" class="bars"><div class="empty">no data yet</div></div>
+    </div>
+
+    <div class="panel">
+      <h2>Latest request — candidate scores</h2>
+      <div id="candPanel"><div class="empty">no routed request yet</div></div>
+    </div>
+
+    <div class="panel detail">
+      <h2>Latest classification</h2>
+      <div id="detailPanel"><div class="empty">no request yet</div></div>
+    </div>
+
+    <div class="panel">
+      <h2>Routing by model_type · risk · mode</h2>
+      <div id="routingChart" class="bars"><div class="empty">no data yet</div></div>
+    </div>
+
+    <div class="panel">
+      <h2>Model score average</h2>
+      <div class="legend"><span><i style="background:var(--series-3)"></i>avg router score across requests</span></div>
+      <div id="avgScoreChart" class="bars"><div class="empty">no data yet</div></div>
+    </div>
+
+    <div class="panel wide">
+      <h2>Recent requests</h2>
+      <div class="table-scroll">
+        <table>
+          <thead>
+            <tr>
+              <th>time</th><th>prompt</th><th>task</th><th>domain</th>
+              <th>risk</th><th>model_type</th><th>selected</th>
+              <th class="num">conf</th><th class="num">class ms</th>
+              <th class="num">prov ms</th><th class="num">tokens</th><th class="num">cost</th><th>status</th>
+            </tr>
+          </thead>
+          <tbody id="recentBody"><tr><td colspan="13" class="empty">no data yet</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+"use strict";
+const $ = (id) => document.getElementById(id);
+const SERIES = ["var(--series-1)","var(--series-2)","var(--series-3)","var(--series-4)","var(--series-5)","var(--series-6)","var(--series-7)","var(--series-8)"];
+const RISK_STYLE = { low: "low", medium: "medium", high: "high", restricted: "restricted" };
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+
+let paused = false;
+let snapshot = null;
+
+function fmtUsd(n) { return n == null ? "–" : "$" + n.toFixed(4); }
+function fmtMs(n) { return n == null ? "–" : Math.round(n) + " ms"; }
+function ago(ts) {
+  const s = Math.round((Date.now() - ts) / 1000);
+  if (s < 2) return "now";
+  if (s < 60) return s + "s ago";
+  if (s < 3600) return Math.round(s / 60) + "m ago";
+  return Math.round(s / 3600) + "h ago";
+}
+
+/* --- bar list helper: rows of label + track + value --- */
+function renderBars(el, items, colorOf) {
+  if (!items.length) { el.innerHTML = '<div class="empty">no data yet</div>'; return; }
+  const max = Math.max(...items.map(i => i.v));
+  el.innerHTML = items.map((it, i) => `
+    <div class="bar-row" title="${esc(it.title || it.k)}">
+      <div class="name">${esc(it.k)}</div>
+      <div class="bar-track"><div class="bar-fill" style="width:${(it.v / max * 100).toFixed(1)}%;background:${colorOf ? colorOf(i, it) : SERIES[i % SERIES.length]}"></div></div>
+      <div class="val ${it.muted ? "muted" : ""}">${esc(it.v)}${it.suffix || ""}</div>
+    </div>`).join("");
+}
+
+function render() {
+  const s = snapshot;
+  if (!s) return;
+  const n = s.counts.requests;
+
+  $("kRequests").textContent = n;
+  $("kFallbacks").textContent = s.counts.providerFallbacks + " provider fallbacks · " + s.counts.providerFailures + " failures";
+  $("kLatency").textContent = n ? Math.round(s.averages.latencyMs) + " ms" : "–";
+  $("kClassifier").textContent = "classifier " + Math.round(s.averages.classifierMs) + " ms avg · " + s.counts.llmFallbacks + " LLM fallbacks";
+  $("kCost").textContent = fmtUsd(s.totals.costUsd);
+  $("kTokens").textContent = s.totals.inputTokens.toLocaleString() + " in / " + s.totals.outputTokens.toLocaleString() + " out";
+  $("kConf").textContent = n ? (Math.round(s.averages.confidence * 100) / 100).toFixed(2) : "–";
+  $("kReview").textContent = s.counts.humanReviewFlags + " human-review flags";
+  $("uptime").textContent = "up " + Math.round(s.uptimeSec / 60) + "m";
+
+  /* task distribution */
+  renderBars($("taskChart"), s.byTask.slice(0, 12).map(t => ({ k: t.key, v: t.value, title: t.key + ": " + t.value })));
+
+  /* model usage */
+  renderBars($("modelChart"), s.byModel.map(m => ({
+    k: m.key, v: m.count, title: m.key + ": " + m.count + " req, " + fmtUsd(m.costUsd),
+    suffix: " · " + fmtUsd(m.costUsd),
+  })));
+
+  /* model_type + risk + mode */
+  const routingRows = [
+    ...s.byModelType.map(r => ({ k: "type " + r.key, v: r.value })),
+    ...s.byRisk.map(r => ({ k: "risk " + r.key, v: r.value })),
+    ...s.byMode.map(r => ({ k: "mode " + r.key, v: r.value })),
+  ];
+  renderBars($("routingChart"), routingRows);
+
+  /* average candidate scores */
+  renderBars($("avgScoreChart"), s.candidateScores.map(m => ({
+    k: m.model, v: m.avgScore, title: m.model + ": avg " + m.avgScore.toFixed(3) + " over " + m.scored + " requests",
+    suffix: " (" + m.scored + ")",
+  })), (i) => SERIES[3]); // aqua = score, consistent across rows
+
+  /* latest request detail */
+  const last = s.allRecords[0];
+  if (last) {
+    $("detailPanel").innerHTML = `
+      <dl>
+        <dt>primary task</dt><dd><strong>${esc(last.primary_task)}</strong> / ${esc(last.domain)}</dd>
+        <dt>complexity</dt><dd>${esc(last.complexity)}</dd>
+        <dt>risk</dt><dd><span class="risk ${RISK_STYLE[last.risk] || "low"}"><i></i>${esc(last.risk)}</span></dd>
+        <dt>model_type</dt><dd>${esc(last.model_type || "–")}</dd>
+        <dt>confidence</dt><dd>${last.confidence ?? "–"}</dd>
+        <dt>signal source</dt><dd>${esc(last.source)}</dd>
+        <dt>classifier</dt><dd>${fmtMs(last.classifierMs)}</dd>
+        <dt>provider</dt><dd>${fmtMs(last.providerMs)}${last.providerMs == null ? "" : " · " + fmtUsd(last.costUsd)}</dd>
+      </dl>
+      <div class="badges">
+        <span class="badge">${esc(last.prompt || "(no prompt)")}</span>
+        ${last.review ? '<span class="badge review">⚠ human review recommended</span>' : ""}
+        ${last.ok === false ? '<span class="badge review">provider failed</span>' : ""}
+      </div>`;
+
+    /* candidate scores of the latest request */
+    const scores = last.scores || [];
+    if (scores.length) {
+      const max = Math.max(...scores.map(([, v]) => v));
+      $("candPanel").innerHTML =
+        '<div class="legend"><span><i style="background:var(--series-3)"></i>winner ' + esc(last.selectedModel || "") + '</span>' +
+        '<span><i style="background:var(--muted)"></i>other candidates</span></div>' +
+        scores.map(([mid, v]) => `
+          <div class="cand-row ${mid === last.selectedModel ? "winner" : ""}">
+            <div class="name">${esc(mid)}</div>
+            <div class="bar-track"><div class="bar-fill ${mid === last.selectedModel ? "win" : "lose"}" style="width:${(v / max * 100).toFixed(1)}%"></div></div>
+            <div class="val">${v.toFixed(3)}</div>
+          </div>`).join("");
+    } else {
+      $("candPanel").innerHTML = '<div class="empty">latest request had no routed candidates</div>';
+    }
+  }
+
+  /* recent requests table */
+  const rows = s.recent;
+  $("recentBody").innerHTML = rows.length ? rows.map(r => `
+    <tr>
+      <td>${esc(ago(r.ts))}</td>
+      <td><strong>${esc(r.prompt)}</strong></td>
+      <td>${esc(r.primary_task)}</td>
+      <td>${esc(r.domain)}</td>
+      <td><span class="risk ${RISK_STYLE[r.risk] || "low"}"><i></i>${esc(r.risk)}</span></td>
+      <td>${esc(r.model_type || "–")}</td>
+      <td><strong>${esc(r.selectedModel || "–")}</strong></td>
+      <td class="num">${r.confidence ?? "–"}</td>
+      <td class="num">${r.classifierMs ?? "–"}</td>
+      <td class="num">${r.providerMs ?? "–"}</td>
+      <td class="num">${r.tokens ?? "–"}</td>
+      <td class="num">${r.costUsd != null ? r.costUsd.toFixed(4) : "–"}</td>
+      <td>${r.ok === false ? '<span class="risk high"><i></i>failed</span>' : (r.ok === null ? "–" : '<span class="risk low"><i></i>ok</span>')}</td>
+    </tr>`).join("")
+    : '<tr><td colspan="13" class="empty">no requests recorded yet</td></tr>';
+}
+
+async function poll() {
+  try {
+    const resp = await fetch("/metrics");
+    if (!resp.ok) throw new Error("HTTP " + resp.status);
+    snapshot = await resp.json();
+    render();
+    $("conn").classList.add("live");
+    $("connText").textContent = "live · " + snapshot.counts.requests + " requests";
+  } catch (err) {
+    $("conn").classList.remove("live");
+    $("connText").textContent = "offline — " + err.message;
+  }
+}
+
+$("btnPause").onclick = () => {
+  paused = !paused;
+  $("btnPause").textContent = paused ? "▶ Resume" : "⏸ Pause";
+  $("btnPause").classList.toggle("active", paused);
+};
+$("btnReset").onclick = async () => { await fetch("/metrics/reset", { method: "POST" }); await poll(); };
+$("btnDemo").onclick = async (e) => {
+  e.target.disabled = true;
+  e.target.textContent = "generating…";
+  try { await fetch("/metrics/demo", { method: "POST" }); } finally {
+    e.target.disabled = false;
+    e.target.textContent = "▶ Generate demo traffic";
+  }
+  await poll();
+};
+
+poll();
+setInterval(() => { if (!paused) poll(); }, 3000);
+</script>
+</body>
+</html>
