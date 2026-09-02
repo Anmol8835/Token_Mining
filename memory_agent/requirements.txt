@@ -1,0 +1,5 @@
+flask>=3.0
+fastembed>=0.3
+numpy>=1.26
+redis>=5.0
+gunicorn>=22.0
