@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Memory Agent</title>
+<style>
+  :root {
+    color-scheme: light dark;
+    --bg: #f5f6f8; --card: #ffffff; --text: #1a1d23; --muted: #6b7280; --border: #e2e4e9;
+    --accent: #4f46e5; --hit-bg: #e6f6ea; --hit: #1a7f37; --miss-bg: #fdecea; --miss: #b42318;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #14161a; --card: #1c1f26; --text: #eef0f3; --muted: #9aa1ac; --border: #2b2f38;
+      --accent: #818cf8; --hit-bg: #123822; --hit: #4ade80; --miss-bg: #3a1414; --miss: #f87171; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; min-height: 100vh; background: var(--bg); color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; padding: 40px 20px; }
+  .wrap { max-width: 720px; margin: 0 auto; display: flex; flex-direction: column; gap: 20px; }
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: 16px;
+    padding: 26px; box-shadow: 0 10px 30px rgba(0,0,0,0.06); }
+  h1 { font-size: 18px; margin: 0 0 4px; }
+  h2 { font-size: 14px; margin: 0 0 12px; }
+  .subtitle { color: var(--muted); font-size: 13px; margin: 0 0 18px; }
+  textarea, input[type=text] { width: 100%; padding: 12px; border-radius: 10px; border: 1px solid var(--border);
+    background: var(--bg); color: var(--text); font-size: 14px; font-family: inherit; }
+  textarea { min-height: 70px; resize: vertical; }
+  input[type=text] { font-family: ui-monospace, monospace; }
+  .row { display: flex; justify-content: space-between; align-items: center; margin-top: 10px; gap: 10px; }
+  button { background: var(--accent); color: white; border: none; padding: 9px 18px; border-radius: 8px;
+    font-size: 13px; font-weight: 600; cursor: pointer; }
+  button:disabled { opacity: 0.5; cursor: not-allowed; }
+  .result { margin-top: 14px; font-size: 13px; }
+  .badge { display: inline-block; padding: 4px 12px; border-radius: 999px; font-weight: 700; font-size: 11px; }
+  .badge.hit { background: var(--hit-bg); color: var(--hit); }
+  .badge.miss { background: var(--miss-bg); color: var(--miss); }
+  .meta { color: var(--muted); margin-top: 8px; }
+  .stats { display: flex; gap: 18px; font-size: 12.5px; color: var(--muted); flex-wrap: wrap; }
+  .userbar { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; }
+  .userbar label { font-size: 12px; color: var(--muted); white-space: nowrap; }
+  .error { color: var(--miss); font-size: 13px; margin-top: 8px; }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="card">
+      <h1>Memory Agent</h1>
+      <p class="subtitle">Two APIs, no LLM: <code>/v1/store</code> remembers a prompt, <code>/v1/query</code> checks for a semantic + lexical hit. Multi-tenant — every call is scoped to the User ID below. FIFO-evicted by count or total size, whichever limit is hit first. &middot; <a href="/dashboard" style="color:var(--accent);">Full dashboard &rarr;</a></p>
+      <div class="userbar">
+        <label for="userIdInput">User ID</label>
+        <input type="text" id="userIdInput" placeholder="e.g. alice" />
+      </div>
+      <div class="stats" id="stats">loading…</div>
+    </div>
+
+    <div class="card">
+      <h2>Store a prompt</h2>
+      <textarea id="storeInput" placeholder="e.g. What is the capital of France?"></textarea>
+      <textarea id="storeResponseInput" placeholder="Response (optional) — e.g. Paris" style="min-height:44px; margin-top:8px;"></textarea>
+      <div class="row">
+        <span></span>
+        <button id="storeBtn">Store</button>
+      </div>
+      <div class="result" id="storeResult"></div>
+    </div>
+
+    <div class="card">
+      <h2>Query for a hit</h2>
+      <textarea id="queryInput" placeholder="e.g. Which city is France's capital?"></textarea>
+      <div class="row">
+        <span></span>
+        <button id="queryBtn">Query</button>
+      </div>
+      <div class="result" id="queryResult"></div>
+    </div>
+  </div>
+
+<script>
+  const USER_KEY = "memory-agent-user-id";
+  const userIdInput = document.getElementById("userIdInput");
+  userIdInput.value = localStorage.getItem(USER_KEY) || "";
+  userIdInput.addEventListener("input", () => localStorage.setItem(USER_KEY, userIdInput.value.trim()));
+
+  function currentUserId() { return userIdInput.value.trim(); }
+
+  const storeInput = document.getElementById("storeInput");
+  const storeResponseInput = document.getElementById("storeResponseInput");
+  const storeBtn = document.getElementById("storeBtn");
+  const storeResult = document.getElementById("storeResult");
+  const queryInput = document.getElementById("queryInput");
+  const queryBtn = document.getElementById("queryBtn");
+  const queryResult = document.getElementById("queryResult");
+  const stats = document.getElementById("stats");
+
+  function requireUser(resultEl) {
+    const uid = currentUserId();
+    if (!uid) {
+      resultEl.innerHTML = `<div class="error">Enter a User ID above first.</div>`;
+      return null;
+    }
+    return uid;
+  }
+
+  async function refreshStats() {
+    const uid = currentUserId();
+    if (!uid) { stats.textContent = "enter a User ID to see stats"; return; }
+    const res = await fetch(`/v1/health?user_id=${encodeURIComponent(uid)}`);
+    const d = await res.json();
+    stats.textContent =
+      `count: ${d.count}/${d.max_count} · memory: ${(d.memory_bytes/1024).toFixed(1)} KB / ${(d.max_memory_bytes/1024/1024).toFixed(1)} MB · semantic: ${d.similarity_threshold} · lexical: ${d.lexical_threshold}`;
+  }
+
+  storeBtn.addEventListener("click", async () => {
+    const uid = requireUser(storeResult);
+    if (!uid) return;
+    const prompt = storeInput.value.trim();
+    const response = storeResponseInput.value.trim();
+    if (!prompt) return;
+    storeBtn.disabled = true;
+    try {
+      const res = await fetch("/v1/store", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ user_id: uid, prompt, response }),
+      });
+      const d = await res.json();
+      if (!res.ok) { storeResult.innerHTML = `<div class="error">${d.error || "request failed"}</div>`; return; }
+      storeResult.innerHTML = d.stored
+        ? `Stored as #${d.stored_id}. ${d.evicted_ids.length ? `Evicted: ${d.evicted_ids.join(", ")}.` : ""}`
+        : `Could not be stored (too large for the memory cap on its own).`;
+      storeInput.value = "";
+      storeResponseInput.value = "";
+      refreshStats();
+    } finally {
+      storeBtn.disabled = false;
+    }
+  });
+
+  queryBtn.addEventListener("click", async () => {
+    const uid = requireUser(queryResult);
+    if (!uid) return;
+    const prompt = queryInput.value.trim();
+    if (!prompt) return;
+    queryBtn.disabled = true;
+    try {
+      const res = await fetch("/v1/query", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ user_id: uid, prompt }),
+      });
+      const d = await res.json();
+      if (!res.ok) { queryResult.innerHTML = `<div class="error">${d.error || "request failed"}</div>`; return; }
+      const via = d.matched_via && d.matched_via.length ? ` (via ${d.matched_via.join(" + ")})` : "";
+      queryResult.innerHTML = `
+        <span class="badge ${d.hit ? "hit" : "miss"}">${d.hit ? "HIT" : "MISS"}</span>
+        <div class="meta">semantic: ${d.similarity ?? "n/a"} · lexical: ${d.lexical_score ?? "n/a"}${via} ${d.hit ? `· matched #${d.matched_id}: "${d.matched_prompt}"` : ""}</div>
+        ${d.hit ? `<div class="meta" style="margin-top:6px;"><strong>Response:</strong> ${d.matched_response ? d.matched_response : "(none stored for this prompt)"}</div>` : ""}
+      `;
+    } finally {
+      queryBtn.disabled = false;
+    }
+  });
+
+  refreshStats();
+</script>
+</body>
+</html>

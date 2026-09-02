@@ -1,0 +1,22 @@
+services:
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    # --appendonly yes: Redis's own durability, so entries survive a container/host
+    # restart even before the redis-data volume is considered — belt and suspenders.
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis-data:/data
+
+  memory-agent:
+    image: memory-agent:latest
+    restart: unless-stopped
+    depends_on:
+      - redis
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+    ports:
+      - "5090:5090"
+
+volumes:
+  redis-data:

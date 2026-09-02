@@ -1,0 +1,533 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Memory Agent Dashboard</title>
+<style>
+  :root {
+    color-scheme: light dark;
+    --bg: #f5f6f8; --card: #ffffff; --text: #1a1d23; --muted: #6b7280; --border: #e2e4e9;
+    --accent: #4f46e5; --hit-bg: #e6f6ea; --hit: #1a7f37; --miss-bg: #fdecea; --miss: #b42318;
+    --bar-bg: #eceef2; --bar-fill: #4f46e5; --bar-fill-warn: #b42318;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #14161a; --card: #1c1f26; --text: #eef0f3; --muted: #9aa1ac; --border: #2b2f38;
+      --accent: #818cf8; --hit-bg: #123822; --hit: #4ade80; --miss-bg: #3a1414; --miss: #f87171;
+      --bar-bg: #22262f; --bar-fill: #818cf8; --bar-fill-warn: #f87171; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; min-height: 100vh; background: var(--bg); color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; padding: 40px 20px; }
+  .wrap { max-width: 1000px; margin: 0 auto; display: flex; flex-direction: column; gap: 20px; }
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: 16px;
+    padding: 24px; box-shadow: 0 10px 30px rgba(0,0,0,0.06); }
+  header { display: flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap; gap: 10px; }
+  h1 { font-size: 19px; margin: 0; }
+  h2 { font-size: 14px; margin: 0 0 14px; }
+  .subtitle { color: var(--muted); font-size: 12.5px; margin: 4px 0 0; }
+  a.navlink { color: var(--accent); text-decoration: none; font-size: 13px; }
+  code { font-family: ui-monospace, "SF Mono", Menlo, monospace; background: rgba(127,127,127,0.14);
+    padding: 1px 5px; border-radius: 4px; font-size: 0.9em; }
+
+  .userbar { display: flex; align-items: center; gap: 10px; margin-top: 14px; }
+  .userbar label { font-size: 12px; color: var(--muted); white-space: nowrap; }
+  .userbar input { flex: 1; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--border);
+    background: var(--bg); color: var(--text); font-size: 13.5px; font-family: ui-monospace, monospace; }
+  .error { color: var(--miss); font-size: 13px; margin-top: 8px; }
+
+  .stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 14px; }
+  .stat-tile { background: var(--bg); border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; }
+  .stat-tile .label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.03em; margin-bottom: 4px; }
+  .stat-tile .value { font-size: 18px; font-weight: 700; }
+
+  .bar-row { margin-top: 14px; }
+  .bar-row .bar-label { display: flex; justify-content: space-between; font-size: 12px; color: var(--muted); margin-bottom: 5px; }
+  .bar-track { height: 8px; border-radius: 999px; background: var(--bar-bg); overflow: hidden; }
+  .bar-fill { height: 100%; border-radius: 999px; background: var(--bar-fill); transition: width 0.3s; }
+  .bar-fill.warn { background: var(--bar-fill-warn); }
+
+  .settings-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; align-items: end; }
+  .field label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 5px; }
+  .field input, .field select { width: 100%; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--border);
+    background: var(--bg); color: var(--text); font-size: 13.5px; font-family: ui-monospace, monospace; }
+  .settings-row { display: flex; justify-content: space-between; align-items: center; margin-top: 16px; }
+  #settingsStatus { font-size: 12px; color: var(--muted); }
+
+  button { background: var(--accent); color: white; border: none; padding: 9px 18px; border-radius: 8px;
+    font-size: 13px; font-weight: 600; cursor: pointer; }
+  button.secondary { background: transparent; color: var(--accent); border: 1px solid var(--border); }
+  button.danger { background: transparent; color: var(--miss); border: 1px solid var(--border); padding: 5px 10px; font-size: 11.5px; }
+  button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  textarea { width: 100%; min-height: 60px; padding: 12px; border-radius: 10px; border: 1px solid var(--border);
+    background: var(--bg); color: var(--text); font-size: 14px; font-family: inherit; resize: vertical; }
+  .row { display: flex; justify-content: space-between; align-items: center; margin-top: 10px; gap: 10px; }
+  .result { margin-top: 14px; font-size: 13px; }
+  .badge { display: inline-block; padding: 4px 12px; border-radius: 999px; font-weight: 700; font-size: 11px; }
+  .badge.hit { background: var(--hit-bg); color: var(--hit); }
+  .badge.miss { background: var(--miss-bg); color: var(--miss); }
+  .meta { color: var(--muted); margin-top: 8px; }
+
+  .table-toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; flex-wrap: wrap; gap: 10px; }
+  .table-toolbar label { font-size: 12px; color: var(--muted); display: flex; align-items: center; gap: 6px; cursor: pointer; }
+  .table-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 10px; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { padding: 9px 12px; text-align: left; border-bottom: 1px solid var(--border); }
+  thead th { font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.03em; color: var(--muted);
+    background: var(--bg); position: sticky; top: 0; }
+  tbody tr:last-child td { border-bottom: none; }
+  tbody tr.highlighted { background: var(--hit-bg); }
+  td.prompt-cell { max-width: 380px; }
+  td.id-cell, td.size-cell { font-family: ui-monospace, monospace; color: var(--muted); white-space: nowrap; }
+  .empty-row td { text-align: center; color: var(--muted); padding: 24px; }
+
+  .explain-list { display: flex; flex-direction: column; gap: 10px; margin-top: 14px; }
+  .explain-card { border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; }
+  .explain-card .top { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
+  .explain-card .rank { font-family: ui-monospace, monospace; font-size: 11px; color: var(--muted); }
+  .explain-card .scores { display: flex; gap: 14px; font-size: 12px; color: var(--muted); margin-top: 6px; flex-wrap: wrap; }
+  .explain-card .scores b { color: var(--text); }
+  .term-chip { display: inline-block; padding: 1px 7px; border-radius: 999px; font-size: 11px; margin: 2px 3px 0 0; font-family: ui-monospace, monospace; }
+  .term-chip.matched { background: var(--hit-bg); color: var(--hit); }
+  .term-chip.unmatched { background: var(--miss-bg); color: var(--miss); opacity: 0.7; }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="card">
+      <header>
+        <div>
+          <h1>Memory Agent Dashboard</h1>
+          <p class="subtitle">Live view of stored prompts, hit/miss testing, and runtime-configurable limits — scoped to one user at a time.</p>
+        </div>
+        <a class="navlink" href="/">&larr; back to store/query test page</a>
+      </header>
+      <div class="userbar">
+        <label for="userIdInput">User ID</label>
+        <input type="text" id="userIdInput" placeholder="e.g. alice" />
+        <button class="secondary" id="switchUserBtn">Load</button>
+      </div>
+      <div id="userError" class="error"></div>
+      <div class="stat-grid" id="statGrid" style="margin-top:18px;"></div>
+      <div class="bar-row">
+        <div class="bar-label"><span>Entry count</span><span id="countLabel"></span></div>
+        <div class="bar-track"><div class="bar-fill" id="countBar"></div></div>
+      </div>
+      <div class="bar-row">
+        <div class="bar-label"><span>Memory size</span><span id="bytesLabel"></span></div>
+        <div class="bar-track"><div class="bar-fill" id="bytesBar"></div></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Settings <span style="color:var(--muted); font-weight:400;">(get_all / set, for this user)</span></h2>
+      <div class="settings-grid">
+        <div class="field">
+          <label for="setMaxCount">max_count</label>
+          <input type="number" id="setMaxCount" min="1" />
+        </div>
+        <div class="field">
+          <label for="setMaxBytes">max_memory_bytes</label>
+          <input type="number" id="setMaxBytes" min="1" />
+        </div>
+        <div class="field">
+          <label for="setThreshold">similarity_threshold (semantic)</label>
+          <input type="number" id="setThreshold" min="0" max="1" step="0.01" />
+        </div>
+        <div class="field">
+          <label for="setLexThreshold">lexical_threshold (BM25 coverage)</label>
+          <input type="number" id="setLexThreshold" min="0" max="1" step="0.01" />
+        </div>
+        <div class="field">
+          <label for="setFocusChars">focus_last_chars (blank = off)</label>
+          <input type="number" id="setFocusChars" min="1" placeholder="e.g. 400" />
+        </div>
+        <div class="field">
+          <label for="setResponseMode">response_mode</label>
+          <select id="setResponseMode">
+            <option value="full">full (hit + similarity + matched prompt/response)</option>
+            <option value="answer_only">answer_only (just {hit, response})</option>
+          </select>
+        </div>
+        <button id="saveSettingsBtn">Apply</button>
+      </div>
+      <div class="settings-row">
+        <span id="settingsStatus"></span>
+        <button class="secondary" id="reloadSettingsBtn">Reload current</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Query tester</h2>
+      <textarea id="queryInput" placeholder="Try a prompt — including a paraphrase of one already stored below"></textarea>
+      <div class="row">
+        <span></span>
+        <button id="queryBtn">Query</button>
+      </div>
+      <div class="result" id="queryResult"></div>
+    </div>
+
+    <div class="card">
+      <h2>Explain <span style="color:var(--muted); font-weight:400;">(why did/didn't this match?)</span></h2>
+      <textarea id="explainInput" placeholder="Same prompt you'd send to Query, but see the full score breakdown for the top candidates"></textarea>
+      <div class="row">
+        <label style="font-size:12px; color:var(--muted); display:flex; align-items:center; gap:6px;">top_k <input type="number" id="explainTopK" value="5" min="1" max="50" style="width:56px; padding:4px 6px; border-radius:6px; border:1px solid var(--border); background:var(--bg); color:var(--text);" /></label>
+        <button id="explainBtn">Explain</button>
+      </div>
+      <div id="explainResult" class="explain-list"></div>
+    </div>
+
+    <div class="card">
+      <div class="table-toolbar">
+        <h2 style="margin:0;">Stored prompts</h2>
+        <label><input type="checkbox" id="autoRefresh" /> Auto-refresh (5s)</label>
+        <button class="secondary" id="refreshBtn">Refresh</button>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>ID</th><th>Prompt</th><th>Response</th><th>Stored</th><th>Size</th><th></th></tr></thead>
+          <tbody id="tableBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="table-toolbar">
+        <h2 style="margin:0;">Call log</h2>
+        <label><input type="checkbox" id="logAutoRefresh" /> Auto-refresh (5s)</label>
+        <button class="secondary" id="logRefreshBtn">Refresh</button>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>ID</th><th>Type</th><th>Prompt</th><th>Result</th><th>Mode</th><th>When</th></tr></thead>
+          <tbody id="logTableBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+<script>
+  const BASE = "";
+  const USER_KEY = "memory-agent-user-id";
+  const userIdInput = document.getElementById("userIdInput");
+  const switchUserBtn = document.getElementById("switchUserBtn");
+  const userError = document.getElementById("userError");
+  userIdInput.value = localStorage.getItem(USER_KEY) || "";
+
+  function currentUserId() { return userIdInput.value.trim(); }
+
+  function requireUser() {
+    const uid = currentUserId();
+    if (!uid) { userError.textContent = "Enter a User ID above and click Load."; return null; }
+    userError.textContent = "";
+    return uid;
+  }
+
+  const statGrid = document.getElementById("statGrid");
+  const countLabel = document.getElementById("countLabel");
+  const countBar = document.getElementById("countBar");
+  const bytesLabel = document.getElementById("bytesLabel");
+  const bytesBar = document.getElementById("bytesBar");
+  const setMaxCount = document.getElementById("setMaxCount");
+  const setMaxBytes = document.getElementById("setMaxBytes");
+  const setThreshold = document.getElementById("setThreshold");
+  const setLexThreshold = document.getElementById("setLexThreshold");
+  const setFocusChars = document.getElementById("setFocusChars");
+  const setResponseMode = document.getElementById("setResponseMode");
+  const saveSettingsBtn = document.getElementById("saveSettingsBtn");
+  const reloadSettingsBtn = document.getElementById("reloadSettingsBtn");
+  const settingsStatus = document.getElementById("settingsStatus");
+  const queryInput = document.getElementById("queryInput");
+  const queryBtn = document.getElementById("queryBtn");
+  const queryResult = document.getElementById("queryResult");
+  const explainInput = document.getElementById("explainInput");
+  const explainTopK = document.getElementById("explainTopK");
+  const explainBtn = document.getElementById("explainBtn");
+  const explainResult = document.getElementById("explainResult");
+  const tableBody = document.getElementById("tableBody");
+  const refreshBtn = document.getElementById("refreshBtn");
+  const autoRefresh = document.getElementById("autoRefresh");
+  const logTableBody = document.getElementById("logTableBody");
+  const logRefreshBtn = document.getElementById("logRefreshBtn");
+  const logAutoRefresh = document.getElementById("logAutoRefresh");
+
+  function fmtBytes(n) {
+    if (n < 1024) return `${n} B`;
+    if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
+    return `${(n / 1024 / 1024).toFixed(2)} MB`;
+  }
+
+  function relTime(ts) {
+    const diff = Date.now() / 1000 - ts;
+    if (diff < 60) return `${Math.floor(diff)}s ago`;
+    if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+    if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+    return `${Math.floor(diff / 86400)}d ago`;
+  }
+
+  function escapeHtml(s) {
+    return s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  }
+
+  async function loadSettings() {
+    const uid = requireUser();
+    if (!uid) return;
+    const res = await fetch(`${BASE}/v1/settings?user_id=${encodeURIComponent(uid)}`);
+    const d = await res.json();
+
+    statGrid.innerHTML = "";
+    const tiles = [
+      ["Stored prompts", d.memory_size],
+      ["Memory used", fmtBytes(d.memory_bytes)],
+      ["Max count", d.max_count],
+      ["Max memory", fmtBytes(d.max_memory_bytes)],
+      ["Semantic threshold", d.similarity_threshold],
+      ["Lexical threshold", d.lexical_threshold],
+      ["Focus window", d.focus_last_chars ? `${d.focus_last_chars} chars` : "off"],
+      ["Response mode", d.response_mode],
+      ["Vector size", d.vector_bytes_per_entry ? `${d.vector_bytes_per_entry} B` : "—"],
+      ["Unique terms", d.unique_terms_indexed],
+    ];
+    tiles.forEach(([label, value]) => {
+      const tile = document.createElement("div");
+      tile.className = "stat-tile";
+      tile.innerHTML = `<div class="label">${label}</div><div class="value">${value}</div>`;
+      statGrid.appendChild(tile);
+    });
+
+    const countPct = Math.min(100, 100 * d.memory_size / d.max_count);
+    countLabel.textContent = `${d.memory_size} / ${d.max_count}`;
+    countBar.style.width = countPct + "%";
+    countBar.className = "bar-fill" + (countPct > 90 ? " warn" : "");
+
+    const bytesPct = Math.min(100, 100 * d.memory_bytes / d.max_memory_bytes);
+    bytesLabel.textContent = `${fmtBytes(d.memory_bytes)} / ${fmtBytes(d.max_memory_bytes)}`;
+    bytesBar.style.width = bytesPct + "%";
+    bytesBar.className = "bar-fill" + (bytesPct > 90 ? " warn" : "");
+
+    setMaxCount.value = d.max_count;
+    setMaxBytes.value = d.max_memory_bytes;
+    setThreshold.value = d.similarity_threshold;
+    setLexThreshold.value = d.lexical_threshold;
+    setFocusChars.value = d.focus_last_chars ?? "";
+    setResponseMode.value = d.response_mode;
+  }
+
+  reloadSettingsBtn.addEventListener("click", loadSettings);
+
+  switchUserBtn.addEventListener("click", () => {
+    localStorage.setItem(USER_KEY, currentUserId());
+    loadAll();
+  });
+  userIdInput.addEventListener("keydown", (e) => { if (e.key === "Enter") switchUserBtn.click(); });
+
+  saveSettingsBtn.addEventListener("click", async () => {
+    const uid = requireUser();
+    if (!uid) return;
+    saveSettingsBtn.disabled = true;
+    settingsStatus.textContent = "Applying…";
+    try {
+      const res = await fetch(`${BASE}/v1/settings`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          user_id: uid,
+          max_count: Number(setMaxCount.value),
+          max_memory_bytes: Number(setMaxBytes.value),
+          similarity_threshold: Number(setThreshold.value),
+          lexical_threshold: Number(setLexThreshold.value),
+          focus_last_chars: setFocusChars.value.trim() ? Number(setFocusChars.value) : null,
+          response_mode: setResponseMode.value,
+        }),
+      });
+      const d = await res.json();
+      if (!res.ok) {
+        settingsStatus.textContent = "Error: " + (d.error || "request failed");
+        return;
+      }
+      settingsStatus.textContent = d.evicted_ids.length
+        ? `Applied — evicted ${d.evicted_ids.length} entr${d.evicted_ids.length === 1 ? "y" : "ies"} to fit new limits.`
+        : "Applied.";
+      loadSettings();
+      loadTable();
+    } finally {
+      saveSettingsBtn.disabled = false;
+    }
+  });
+
+  async function loadTable() {
+    const uid = requireUser();
+    if (!uid) return;
+    const res = await fetch(`${BASE}/v1/list?user_id=${encodeURIComponent(uid)}`);
+    const d = await res.json();
+    tableBody.innerHTML = "";
+    if (!d.entries.length) {
+      tableBody.innerHTML = `<tr class="empty-row"><td colspan="6">No prompts stored yet for this user — use the test page or /v1/store.</td></tr>`;
+      return;
+    }
+    d.entries.slice().reverse().forEach((e) => {
+      const tr = document.createElement("tr");
+      tr.dataset.id = e.id;
+      tr.innerHTML = `
+        <td class="id-cell">#${e.id}</td>
+        <td class="prompt-cell">${escapeHtml(e.prompt)}</td>
+        <td class="prompt-cell">${e.response ? escapeHtml(e.response) : '<span style="color:var(--muted);">—</span>'}</td>
+        <td class="id-cell">${relTime(e.timestamp)}</td>
+        <td class="size-cell">${fmtBytes(e.size_bytes)}</td>
+        <td><button class="danger delete-btn" data-id="${e.id}">Delete</button></td>
+      `;
+      tableBody.appendChild(tr);
+    });
+    tableBody.querySelectorAll(".delete-btn").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        const uid2 = requireUser();
+        if (!uid2) return;
+        btn.disabled = true;
+        try {
+          const res = await fetch(`${BASE}/v1/entries/${btn.dataset.id}?user_id=${encodeURIComponent(uid2)}`, { method: "DELETE" });
+          if (res.ok) { loadTable(); loadSettings(); }
+        } finally {
+          btn.disabled = false;
+        }
+      });
+    });
+  }
+
+  refreshBtn.addEventListener("click", () => { loadSettings(); loadTable(); });
+
+  async function loadLogs() {
+    const uid = requireUser();
+    if (!uid) return;
+    const res = await fetch(`${BASE}/v1/logs?user_id=${encodeURIComponent(uid)}&limit=100`);
+    const d = await res.json();
+    logTableBody.innerHTML = "";
+    if (!d.logs.length) {
+      logTableBody.innerHTML = `<tr class="empty-row"><td colspan="6">No calls logged yet for this user.</td></tr>`;
+      return;
+    }
+    d.logs.forEach((l) => {
+      const tr = document.createElement("tr");
+      let result;
+      if (l.type === "query") {
+        const via = l.matched_via && l.matched_via.length ? ` (${l.matched_via.join("+")})` : "";
+        result = `<span class="badge ${l.hit ? "hit" : "miss"}">${l.hit ? "HIT" : "MISS"}</span> sem:${l.similarity ?? "—"} lex:${l.lexical_score ?? "—"}${via}`;
+      } else if (l.type === "delete") {
+        result = `deleted #${l.deleted_id}`;
+      } else {
+        result = l.stored ? `stored #${l.stored_id}` : "not stored (too large)";
+        if (l.evicted_ids && l.evicted_ids.length) result += ` · evicted ${l.evicted_ids.length}`;
+      }
+      tr.innerHTML = `
+        <td class="id-cell">#${l.id}</td>
+        <td class="id-cell">${l.type}</td>
+        <td class="prompt-cell">${l.prompt ? escapeHtml(l.prompt) : '<span style="color:var(--muted);">—</span>'}</td>
+        <td>${result}</td>
+        <td class="id-cell">${l.response_mode || "—"}</td>
+        <td class="id-cell">${relTime(l.timestamp)}</td>
+      `;
+      logTableBody.appendChild(tr);
+    });
+  }
+
+  logRefreshBtn.addEventListener("click", loadLogs);
+  let logAutoTimer = null;
+  logAutoRefresh.addEventListener("change", () => {
+    if (logAutoRefresh.checked) {
+      logAutoTimer = setInterval(loadLogs, 5000);
+    } else if (logAutoTimer) {
+      clearInterval(logAutoTimer);
+    }
+  });
+
+  let autoTimer = null;
+  autoRefresh.addEventListener("change", () => {
+    if (autoRefresh.checked) {
+      autoTimer = setInterval(() => { loadSettings(); loadTable(); }, 5000);
+    } else if (autoTimer) {
+      clearInterval(autoTimer);
+    }
+  });
+
+  queryBtn.addEventListener("click", async () => {
+    const uid = requireUser();
+    if (!uid) return;
+    const prompt = queryInput.value.trim();
+    if (!prompt) return;
+    queryBtn.disabled = true;
+    try {
+      const res = await fetch(`${BASE}/v1/query`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ user_id: uid, prompt }),
+      });
+      const d = await res.json();
+      if (!res.ok) { queryResult.innerHTML = `<div class="error">${d.error || "request failed"}</div>`; return; }
+      const responseText = "matched_response" in d ? d.matched_response : d.response;
+      const hasMatchedId = "matched_id" in d;
+      const viaLabel = d.matched_via && d.matched_via.length ? ` · via ${d.matched_via.join(" + ")}` : "";
+      queryResult.innerHTML = `
+        <span class="badge ${d.hit ? "hit" : "miss"}">${d.hit ? "HIT" : "MISS"}</span>
+        <div class="meta">${"similarity" in d ? `semantic: ${d.similarity ?? "n/a"} · lexical: ${d.lexical_score ?? "n/a"}` : `response_mode: answer_only (scores hidden — see the call log for the full detail)`}${viaLabel} ${d.hit && hasMatchedId ? `· matched #${d.matched_id}` : ""}</div>
+        ${d.hit ? `<div class="meta" style="margin-top:6px;"><strong>Response:</strong> ${responseText ? escapeHtml(responseText) : "(none stored for this prompt)"}</div>` : ""}
+      `;
+      document.querySelectorAll("tbody tr").forEach((tr) => tr.classList.remove("highlighted"));
+      if (d.hit && hasMatchedId) {
+        const row = tableBody.querySelector(`tr[data-id="${d.matched_id}"]`);
+        if (row) { row.classList.add("highlighted"); row.scrollIntoView({ behavior: "smooth", block: "center" }); }
+      }
+    } finally {
+      queryBtn.disabled = false;
+    }
+  });
+
+  explainBtn.addEventListener("click", async () => {
+    const uid = requireUser();
+    if (!uid) return;
+    const prompt = explainInput.value.trim();
+    if (!prompt) return;
+    explainBtn.disabled = true;
+    try {
+      const res = await fetch(`${BASE}/v1/explain`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ user_id: uid, prompt, top_k: Number(explainTopK.value) || 5 }),
+      });
+      const d = await res.json();
+      if (!res.ok) { explainResult.innerHTML = `<div class="error">${d.error || "request failed"}</div>`; return; }
+      if (!d.candidates.length) {
+        explainResult.innerHTML = `<div class="meta">No entries stored for this user yet.</div>`;
+        return;
+      }
+      explainResult.innerHTML = d.candidates.map((c, i) => `
+        <div class="explain-card">
+          <div class="top">
+            <strong>#${c.id}: ${escapeHtml(c.prompt)}</strong>
+            <span class="rank">RRF #${i + 1}</span>
+          </div>
+          ${c.response ? `<div class="meta" style="margin:2px 0 0;">${escapeHtml(c.response)}</div>` : ""}
+          <div class="scores">
+            <span>cosine: <b>${c.cosine}</b> (rank ${c.cosine_rank})</span>
+            <span>bm25 raw: <b>${c.bm25_raw}</b> (rank ${c.bm25_rank})</span>
+            <span>lexical coverage: <b>${c.lexical_coverage}</b></span>
+          </div>
+          <div style="margin-top:6px;">
+            ${c.matched_terms.map(t => `<span class="term-chip matched">${escapeHtml(t)}</span>`).join("")}
+            ${c.unmatched_terms.map(t => `<span class="term-chip unmatched">${escapeHtml(t)}</span>`).join("")}
+          </div>
+        </div>
+      `).join("");
+    } finally {
+      explainBtn.disabled = false;
+    }
+  });
+
+  function loadAll() {
+    if (!requireUser()) return;
+    loadSettings();
+    loadTable();
+    loadLogs();
+  }
+
+  loadAll();
+</script>
+</body>
+</html>
