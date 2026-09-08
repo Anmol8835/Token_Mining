@@ -9,8 +9,9 @@ const ProviderRegistry = require("./lib/providers");
 const HybridClassifier = require("./lib/classifier");
 const { selectModel } = require("./lib/router");
 const { toPublicShape } = require("./lib/classifier/taxonomy");
-const { getLastUserMessage } = require("./lib/classifier/text-utils");
+const { getLastUserMessage, extractSystemText } = require("./lib/classifier/text-utils");
 const metrics = require("./lib/metrics");
+const { runEvalSet } = require("./lib/eval");
 
 // ------------------------------------------------------------
 // Shared helpers
@@ -56,6 +57,7 @@ function attachClassification(res, classification, debug) {
 function loadConfig() {
   const modelsPath = path.join(__dirname, "config", "models.json");
   const serverPath = path.join(__dirname, "config", "server.json");
+  const pricingPath = path.join(__dirname, "config", "pricing.json");
 
   if (!fs.existsSync(modelsPath)) {
     console.error("ERROR: config/models.json not found");
@@ -67,7 +69,25 @@ function loadConfig() {
     ? JSON.parse(fs.readFileSync(serverPath, "utf8"))
     : {};
 
-  return { modelsConfig, serverConfig };
+  // Pricing is the single source of truth for cost math. Apply it
+  // over the per-model `cost` fields; models.json only acts as a
+  // fallback for models missing from pricing.json.
+  let pricingConfig = null;
+  if (fs.existsSync(pricingPath)) {
+    pricingConfig = JSON.parse(fs.readFileSync(pricingPath, "utf8"));
+    for (const model of modelsConfig.models || []) {
+      const price = pricingConfig.models?.[model.id];
+      if (price) {
+        model.cost = {
+          inputPer1M: price.inputPer1M,
+          outputPer1M: price.outputPer1M,
+          ...(price.peakMultiplier ? { peakMultiplier: price.peakMultiplier } : {}),
+        };
+      }
+    }
+  }
+
+  return { modelsConfig, serverConfig, pricingConfig };
 }
 
 // ============================================================
@@ -83,8 +103,11 @@ app.use(express.json({ limit: "50mb" }));
 app.use(express.static(path.join(__dirname, "public")));
 
 // Load configs and initialize
-const { modelsConfig, serverConfig } = loadConfig();
+const { modelsConfig, serverConfig, pricingConfig } = loadConfig();
 const registry = new ProviderRegistry(modelsConfig, serverConfig);
+
+// Metrics need pricing for the fixed-model baseline comparison.
+if (pricingConfig) metrics.setPricing(pricingConfig);
 
 if (registry.getAllModels().length === 0) {
   console.error("ERROR: No models available. Check your API keys and config/models.json");
@@ -102,6 +125,61 @@ function costFor(model, usage) {
   const inputCost = (usage.input_tokens || 0) * (model.cost.inputPer1M / 1e6);
   const outputCost = (usage.output_tokens || 0) * (model.cost.outputPer1M / 1e6);
   return Math.round((inputCost + outputCost) * 1e6) / 1e6; // USD, 6 dp
+}
+
+/**
+ * DEBUG breakdown — tokens and cost for one request, split into
+ * user vs system input. The system prompt is re-injected before
+ * the provider call, so its tokens ARE billed as input.
+ *
+ * NOTE: providers report ONE input-token total. The user/system
+ * split here is estimated from character counts (~3.5 chars/token).
+ */
+function logCostBreakdown({ systemText, servingAttempt, classifierCost, stream }) {
+  const usage = servingAttempt?.usage || null;
+
+  if (!usage || (!usage.input_tokens && !usage.output_tokens)) {
+    // No provider call (e.g. /v1/classify) — report the classifier cost alone.
+    if (classifierCost?.costUsd) {
+      console.log(
+        `💰 classifier-only call: ${classifierCost.inputTokens} in / ${classifierCost.outputTokens} out = ` +
+        `$${classifierCost.costUsd.toFixed(6)} (${classifierCost.model})`
+      );
+    } else if (stream) {
+      console.log(`💰 tokens: streaming — usage unavailable from provider`);
+    } else {
+      console.log("💰 tokens: none reported");
+    }
+    return;
+  }
+
+  const input = usage.input_tokens || 0;
+  const output = usage.output_tokens || 0;
+  const estSysTokens = Math.ceil((systemText?.length || 0) / 3.5);
+  const estUserTokens = Math.max(0, input - estSysTokens);
+
+  const providerCost = servingAttempt?.costUsd || 0;
+  const clsCost = classifierCost?.costUsd || 0;
+  const actual = providerCost + clsCost;
+
+  // Hypothetical: the SAME tokens priced on each baseline model.
+  const hypo = (pricingConfig?.baselines || [])
+    .map((b) => {
+      const p = pricingConfig?.models?.[b.modelId];
+      if (!p) return `${b.label}=?`;
+      const cost = (input * p.inputPer1M + output * p.outputPer1M) / 1e6;
+      return `${b.label}=$${cost.toFixed(6)}`;
+    })
+    .join(", ");
+
+  console.log(
+    `💰 tokens: user≈${estUserTokens} + system≈${estSysTokens} (${systemText?.length || 0} chars) in / ${output} out`
+  );
+  console.log(
+    `   cost: providers $${providerCost.toFixed(6)} + classifier $${clsCost.toFixed(6)} = $${actual.toFixed(6)}` +
+    (hypo ? ` | hypothetical: ${hypo}` : "") +
+    (clsCost ? ` | classifier: ${classifierCost.inputTokens} in / ${classifierCost.outputTokens} out` : "")
+  );
 }
 
 // ============================================================
@@ -131,8 +209,11 @@ async function callProvider(provider, nativePayload, stream, res, modelId, extra
       timeout: 300000,
     });
 
-    await provider.streamResponse(response.data, res, modelId);
-    return { streamed: true }; // stream handled, response sent
+    // Provider streamResponse resolves with { input_tokens, output_tokens }
+    // when the provider exposes usage (Anthropic natively, DeepSeek/OpenAI
+    // via include_usage, Gemini via usageMetadata).
+    const usage = await provider.streamResponse(response.data, res, modelId);
+    return { streamed: true, usage }; // stream handled, response sent
   } else {
     let url;
     if (provider.getNonStreamingUrl) {
@@ -177,8 +258,17 @@ app.post("/v1/classify", async (req, res) => {
       prompt: getLastUserMessage(req.body.messages),
       classification,
       classifierMs: Date.now() - startTime,
+      classifierCost: classification.metadata?.classifierCost || null,
       route: null,
       providerResult: null,
+    });
+
+    // DEBUG: classifier-only cost breakdown.
+    logCostBreakdown({
+      systemText: extractSystemText(req.body.system),
+      servingAttempt: null,
+      classifierCost: classification.metadata?.classifierCost || null,
+      stream: false,
     });
 
     res.setHeader("X-Classification", JSON.stringify(toPublicShape(classification)));
@@ -358,9 +448,18 @@ app.post("/v1/messages", async (req, res) => {
         prompt: getLastUserMessage(req.body.messages),
         classification,
         classifierMs,
+        classifierCost: classification.metadata?.classifierCost || null,
         route: routeResult,
         providerFallbacks: fallbacksUsed,
         providerResult: servingAttempt,
+      });
+
+      // DEBUG: token + cost breakdown for this request.
+      logCostBreakdown({
+        systemText: extractSystemText(req.body.system),
+        servingAttempt,
+        classifierCost: classification.metadata?.classifierCost || null,
+        stream,
       });
     }
 
@@ -406,7 +505,25 @@ app.get("/metrics", (req, res) => {
 
 app.post("/metrics/reset", (req, res) => {
   metrics.reset();
+  // ?global=1 also wipes the persisted all-time counter.
+  if (req.query.global === "1") metrics.resetGlobal();
   res.json({ ok: true });
+});
+
+// Run the labeled eval set (config/eval-prompts.json) through the
+// real classifier and store the accuracy summary for the dashboard.
+app.post("/metrics/eval", async (req, res) => {
+  try {
+    const summary = await runEvalSet(
+      classifier,
+      path.join(__dirname, "config", "eval-prompts.json")
+    );
+    metrics.recordEvalRun(summary);
+    res.json(summary);
+  } catch (err) {
+    console.error("Eval run failed:", err.message);
+    res.status(500).json({ type: "error", error: { type: "api_error", message: err.message } });
+  }
 });
 
 // Generate a burst of representative traffic through the REAL
@@ -457,6 +574,7 @@ app.post("/metrics/demo", async (req, res) => {
         classifierMs,
         route,
         providerFallbacks: 0,
+        demo: true, // simulated — excluded from the persisted global counter
         providerResult: {
           modelId: model.id,
           latencyMs: 200 + (promptLen % 9) * 120,
@@ -483,5 +601,6 @@ app.listen(PORT, () => {
   console.log(`   POST /v1/classify    — Prompt classification (JSON only)`);
   console.log(`   GET  /               — Routing metrics dashboard`);
   console.log(`   GET  /metrics        — Metrics JSON`);
+  console.log(`   POST /metrics/eval   — Run classifier eval set`);
   console.log(`   GET  /health         — Server status\n`);
 });

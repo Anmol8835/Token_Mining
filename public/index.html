@@ -110,6 +110,17 @@
   .legend i { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
   .empty { color: var(--muted); font-size: 13px; padding: 12px 0; }
 
+  /* --- eval set --- */
+  .eval-head { display: flex; gap: 18px; align-items: baseline; flex-wrap: wrap; margin-bottom: 10px; }
+  .eval-head .score { font-size: 24px; font-weight: 650; }
+  .eval-head .meta { color: var(--text-secondary); font-size: 12.5px; }
+  .eval-head .score.ok { color: var(--series-3); }
+  .eval-head .score.bad { color: var(--status-serious); }
+  .eval-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media (max-width: 900px) { .eval-grid { grid-template-columns: 1fr; } }
+  .eval-fail td .got { color: var(--status-serious); }
+  .eval-fail td .want { color: var(--series-3); }
+
   /* Latest classification detail */
   .detail dl {
     display: grid; grid-template-columns: auto 1fr; gap: 4px 18px; margin: 0;
@@ -176,7 +187,8 @@
 
   <div class="controls">
     <button id="btnDemo" title="Run 12 varied prompts through the real classifier and router">▶ Generate demo traffic</button>
-    <button id="btnReset" title="Clear all recorded metrics">Reset</button>
+    <button id="btnEval" title="Run the labeled eval set through the classifier">▶ Run eval set</button>
+    <button id="btnReset" title="Clear session metrics (all-time counter is kept)">Reset session</button>
     <button id="btnPause" title="Pause polling">⏸ Pause</button>
     <span class="conn" id="conn"><span class="dot"></span><span id="connText">connecting…</span></span>
     <span class="sub" id="uptime"></span>
@@ -187,9 +199,15 @@
     <div class="kpi"><div class="label">Avg total latency</div><div class="value" id="kLatency">–</div><div class="hint" id="kClassifier">classifier 0 ms</div></div>
     <div class="kpi"><div class="label">Est. total cost</div><div class="value" id="kCost">–</div><div class="hint" id="kTokens">0 in / 0 out tokens</div></div>
     <div class="kpi"><div class="label">Avg confidence</div><div class="value" id="kConf">–</div><div class="hint" id="kReview">0 review flags</div></div>
+    <div class="kpi"><div class="label">All-time total cost</div><div class="value" id="kGlobalCost">–</div><div class="hint" id="kGlobalHint">persisted across restarts</div></div>
   </div>
 
   <div class="grid">
+    <div class="panel wide">
+      <h2>Classifier eval set <span class="sub" style="text-transform:none">(config/eval-prompts.json)</span></h2>
+      <div id="evalPanel"><div class="empty">not run yet — click "Run eval set" above</div></div>
+    </div>
+
     <div class="panel">
       <h2>Requests by primary task</h2>
       <div id="taskChart" class="bars"><div class="empty">no data yet — send requests or generate demo traffic</div></div>
@@ -198,6 +216,11 @@
     <div class="panel">
       <h2>Model usage <span class="sub" style="text-transform:none">(requests · est. cost)</span></h2>
       <div id="modelChart" class="bars"><div class="empty">no data yet</div></div>
+    </div>
+
+    <div class="panel">
+      <h2>Cost vs fixed-model baselines <span class="sub" style="text-transform:none">(same tokens, one model always)</span></h2>
+      <div id="costPanel"><div class="empty">no data yet</div></div>
     </div>
 
     <div class="panel">
@@ -280,12 +303,28 @@ function render() {
   $("kRequests").textContent = n;
   $("kFallbacks").textContent = s.counts.providerFallbacks + " provider fallbacks · " + s.counts.providerFailures + " failures";
   $("kLatency").textContent = n ? Math.round(s.averages.latencyMs) + " ms" : "–";
-  $("kClassifier").textContent = "classifier " + Math.round(s.averages.classifierMs) + " ms avg · " + s.counts.llmFallbacks + " LLM fallbacks";
-  $("kCost").textContent = fmtUsd(s.totals.costUsd);
-  $("kTokens").textContent = s.totals.inputTokens.toLocaleString() + " in / " + s.totals.outputTokens.toLocaleString() + " out";
+  $("kClassifier").textContent =
+    "classifier " + Math.round(s.averages.classifierMs) + " ms avg · " +
+    (s.totals.classifierCalls || 0) + " LLM-fallback calls · $" + s.totals.classifierCostUsd.toFixed(4);
+  $("kCost").textContent = fmtUsd(s.totals.totalCostUsd);
+  $("kTokens").textContent =
+    s.totals.inputTokens.toLocaleString() + " in / " + s.totals.outputTokens.toLocaleString() + " out" +
+    (s.totals.classifierCalls
+      ? " · classifier $" + s.totals.classifierCostUsd.toFixed(4) + " (" + s.totals.classifierCalls + " calls)"
+      : "");
   $("kConf").textContent = n ? (Math.round(s.averages.confidence * 100) / 100).toFixed(2) : "–";
   $("kReview").textContent = s.counts.humanReviewFlags + " human-review flags";
   $("uptime").textContent = "up " + Math.round(s.uptimeSec / 60) + "m";
+
+  /* all-time persisted counters */
+  const g = s.global;
+  if (g) {
+    $("kGlobalCost").textContent = fmtUsd(g.totalCostUsd);
+    $("kGlobalHint").textContent =
+      g.requests.toLocaleString() + " requests · " +
+      g.inputTokens.toLocaleString() + " in / " + g.outputTokens.toLocaleString() + " out tokens · since " +
+      (g.since ? g.since.slice(0, 10) : "—");
+  }
 
   /* task distribution */
   renderBars($("taskChart"), s.byTask.slice(0, 12).map(t => ({ k: t.key, v: t.value, title: t.key + ": " + t.value })));
@@ -295,6 +334,55 @@ function render() {
     k: m.key, v: m.count, title: m.key + ": " + m.count + " req, " + fmtUsd(m.costUsd),
     suffix: " · " + fmtUsd(m.costUsd),
   })));
+
+  /* cost vs fixed-model baselines */
+  const baselines = s.costBaselines || [];
+  if (!baselines.length) {
+    $("costPanel").innerHTML = '<div class="empty">no pricing config loaded</div>';
+  } else if (s.counts.requests === 0) {
+    $("costPanel").innerHTML = '<div class="empty">no traffic yet — savings appear once requests are recorded</div>';
+  } else {
+    const rows = [
+      {
+        k: "proxy (actual)", v: s.totals.totalCostUsd,
+        title: "Actual routed cost: " + fmtUsd(s.totals.totalCostUsd) +
+          (s.totals.classifierCalls
+            ? " (providers $" + s.totals.costUsd.toFixed(4) +
+              " + classifier $" + s.totals.classifierCostUsd.toFixed(4) + ")"
+            : ""),
+        suffix: " " + fmtUsd(s.totals.totalCostUsd),
+        muted: true,
+      },
+      ...baselines.map((b) => ({
+        k: b.label, v: b.hypotheticalCost,
+        title: b.label + " (always): " + fmtUsd(b.hypotheticalCost) +
+          (b.savedPct != null ? " — proxy saves " + fmtUsd(b.savedUsd) + " (" + b.savedPct + "%)" : ""),
+        suffix: " " + fmtUsd(b.hypotheticalCost),
+      })),
+    ];
+    renderBars($("costPanel"), rows, (i) =>
+      i === 0 ? "var(--series-3)" : "var(--muted)"
+    );
+    $("costPanel").innerHTML +=
+      '<div style="margin-top:10px;font-size:12.5px;color:var(--text-secondary)">' +
+      "<div>Session: " +
+      baselines.map((b) =>
+        b.savedPct != null
+          ? "saves <strong>" + fmtUsd(b.savedUsd) + " (" + b.savedPct + "%)</strong> vs " + esc(b.label)
+          : esc(b.label) + ": pricing missing"
+      ).join(" · ") +
+      "</div>" +
+      (s.global && s.global.requests > 0
+        ? "<div style='margin-top:4px'>All time: " +
+          s.global.baselines.map((b) =>
+            b.savedPct != null
+              ? "saved <strong>" + fmtUsd(b.savedUsd) + " (" + b.savedPct + "%)</strong> vs " + esc(b.label)
+              : esc(b.label) + ": pricing missing"
+          ).join(" · ") +
+          "</div>"
+        : "") +
+      "</div>";
+  }
 
   /* model_type + risk + mode */
   const routingRows = [
@@ -309,6 +397,52 @@ function render() {
     k: m.model, v: m.avgScore, title: m.model + ": avg " + m.avgScore.toFixed(3) + " over " + m.scored + " requests",
     suffix: " (" + m.scored + ")",
   })), (i) => SERIES[3]); // aqua = score, consistent across rows
+
+  /* --- eval set panel --- */
+  const ev = s.eval;
+  if (!ev) {
+    $("evalPanel").innerHTML = '<div class="empty">not run yet — click "Run eval set" above</div>';
+  } else {
+    const ok = ev.accuracy >= 90;
+    const fieldBars = ev.byField.map((f) => ({
+      k: f.field,
+      v: f.accuracy,
+      title: f.field + ": " + f.passed + "/" + f.total + " correct",
+      suffix: "%",
+    }));
+    const failRows = ev.failures.flatMap((r) =>
+      r.fails.map((f) => ({ id: r.id, prompt: r.prompt, field: f.field, got: f.got, want: f.want }))
+    );
+    $("evalPanel").innerHTML = `
+      <div class="eval-head">
+        <span class="score ${ok ? "ok" : "bad"}">${ev.passed}/${ev.total} passed (${ev.accuracy}%)</span>
+        <span class="meta">${ev.byField.length} fields asserted · ${ago(ev.lastRunAt)}</span>
+      </div>
+      <div class="eval-grid">
+        <div id="evalFields" class="bars">${fieldBars.length ? "" : '<div class="empty">no fields asserted</div>'}</div>
+        <div>
+          ${failRows.length
+            ? `<div class="table-scroll" style="max-height:260px">
+                 <table>
+                   <thead><tr><th>id</th><th>field</th><th>got</th><th>expected</th></tr></thead>
+                   <tbody>
+                     ${failRows.map((r) => `
+                       <tr class="eval-fail">
+                         <td>${esc(r.id)}</td><td>${esc(r.field)}</td>
+                         <td><span class="got">${esc(String(r.got))}</span></td>
+                         <td><span class="want">${esc(String(r.want))}</span></td>
+                       </tr>`).join("")}
+                   </tbody>
+                 </table>
+               </div>`
+            : '<div class="empty">✓ every assertion passed</div>'}
+        </div>
+      </div>`;
+    // field bars rendered after the innerHTML swap
+    renderBars($("evalFields"), fieldBars, (i, it) =>
+      it.v >= 90 ? "var(--series-3)" : "var(--status-serious)"
+    );
+  }
 
   /* latest request detail */
   const last = s.allRecords[0];
@@ -363,7 +497,11 @@ function render() {
       <td class="num">${r.classifierMs ?? "–"}</td>
       <td class="num">${r.providerMs ?? "–"}</td>
       <td class="num">${r.tokens ?? "–"}</td>
-      <td class="num">${r.costUsd != null ? r.costUsd.toFixed(4) : "–"}</td>
+      <td class="num" title="${r.classifierCostUsd ? "provider $" + (r.costUsd != null ? r.costUsd.toFixed(4) : "0") + " + classifier $" + r.classifierCostUsd.toFixed(4) : ""}">${
+        r.costUsd != null
+          ? ((r.costUsd + (r.classifierCostUsd || 0)).toFixed(4))
+          : (r.classifierCostUsd != null ? r.classifierCostUsd.toFixed(4) : "–")
+      }</td>
       <td>${r.ok === false ? '<span class="risk high"><i></i>failed</span>' : (r.ok === null ? "–" : '<span class="risk low"><i></i>ok</span>')}</td>
     </tr>`).join("")
     : '<tr><td colspan="13" class="empty">no requests recorded yet</td></tr>';
@@ -395,6 +533,15 @@ $("btnDemo").onclick = async (e) => {
   try { await fetch("/metrics/demo", { method: "POST" }); } finally {
     e.target.disabled = false;
     e.target.textContent = "▶ Generate demo traffic";
+  }
+  await poll();
+};
+$("btnEval").onclick = async (e) => {
+  e.target.disabled = true;
+  e.target.textContent = "running eval…";
+  try { await fetch("/metrics/eval", { method: "POST" }); } finally {
+    e.target.disabled = false;
+    e.target.textContent = "▶ Run eval set";
   }
   await poll();
 };

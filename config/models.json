@@ -11,12 +11,28 @@
         "toolUse": true,
         "streaming": true
       },
-      "cost": { "inputPer1M": 0.27, "outputPer1M": 1.10 },
+      "cost": {
+        "inputPer1M": 0.22,
+        "outputPer1M": 0.66
+      },
       "profile": {
         "complexity": "medium",
-        "modelTypes": ["general_model", "coding_model"],
-        "tasks": ["general_conversation", "code_generation", "code_explanation", "fact_lookup", "explanation"],
-        "strengths": ["fast", "cheap", "coding"],
+        "modelTypes": [
+          "general_model",
+          "coding_model"
+        ],
+        "tasks": [
+          "general_conversation",
+          "code_generation",
+          "code_explanation",
+          "fact_lookup",
+          "explanation"
+        ],
+        "strengths": [
+          "fast",
+          "cheap",
+          "coding"
+        ],
         "costTier": "budget",
         "latencyTier": "normal"
       }
@@ -32,12 +48,28 @@
         "toolUse": false,
         "streaming": true
       },
-      "cost": { "inputPer1M": 0.55, "outputPer1M": 2.19 },
+      "cost": {
+        "inputPer1M": 0.55,
+        "outputPer1M": 2.19
+      },
       "profile": {
         "complexity": "high",
-        "modelTypes": ["reasoning_model"],
-        "tasks": ["mathematics", "analysis", "logical_reasoning", "planning", "decision_support", "research"],
-        "strengths": ["reasoning", "math", "analysis"],
+        "modelTypes": [
+          "reasoning_model"
+        ],
+        "tasks": [
+          "mathematics",
+          "analysis",
+          "logical_reasoning",
+          "planning",
+          "decision_support",
+          "research"
+        ],
+        "strengths": [
+          "reasoning",
+          "math",
+          "analysis"
+        ],
         "costTier": "budget",
         "latencyTier": "quality"
       }
@@ -53,12 +85,37 @@
         "toolUse": true,
         "streaming": true
       },
-      "cost": { "inputPer1M": 0.53, "outputPer1M": 2.19 },
+      "cost": {
+        "inputPer1M": 0.66,
+        "outputPer1M": 1.98
+      },
       "profile": {
         "complexity": "high",
-        "modelTypes": ["general_model", "coding_model", "reasoning_model", "multimodal_model", "long_context_model"],
-        "tasks": ["code_generation", "debugging", "code_review", "code_refactoring", "technical_design", "analysis", "research", "creative_generation", "general_conversation"],
-        "strengths": ["reasoning", "coding", "analysis", "tool-use", "vision"],
+        "modelTypes": [
+          "general_model",
+          "coding_model",
+          "reasoning_model",
+          "multimodal_model",
+          "long_context_model"
+        ],
+        "tasks": [
+          "code_generation",
+          "debugging",
+          "code_review",
+          "code_refactoring",
+          "technical_design",
+          "analysis",
+          "research",
+          "creative_generation",
+          "general_conversation"
+        ],
+        "strengths": [
+          "reasoning",
+          "coding",
+          "analysis",
+          "tool-use",
+          "vision"
+        ],
         "costTier": "standard",
         "latencyTier": "normal"
       }
@@ -74,12 +131,32 @@
         "toolUse": true,
         "streaming": true
       },
-      "cost": { "inputPer1M": 0.14, "outputPer1M": 0.28 },
+      "cost": {
+        "inputPer1M": 0.22,
+        "outputPer1M": 0.66
+      },
       "profile": {
         "complexity": "low",
-        "modelTypes": ["fast_model", "multimodal_model"],
-        "tasks": ["general_conversation", "fact_lookup", "summarization", "extraction", "classification", "translation", "rewriting", "command_generation"],
-        "strengths": ["fast", "cheap", "coding", "vision"],
+        "modelTypes": [
+          "fast_model",
+          "multimodal_model"
+        ],
+        "tasks": [
+          "general_conversation",
+          "fact_lookup",
+          "summarization",
+          "extraction",
+          "classification",
+          "translation",
+          "rewriting",
+          "command_generation"
+        ],
+        "strengths": [
+          "fast",
+          "cheap",
+          "coding",
+          "vision"
+        ],
         "costTier": "budget",
         "latencyTier": "fast"
       }
@@ -95,12 +172,31 @@
         "toolUse": true,
         "streaming": true
       },
-      "cost": { "inputPer1M": 1.0, "outputPer1M": 5.0 },
+      "cost": {
+        "inputPer1M": 1,
+        "outputPer1M": 5
+      },
       "profile": {
         "complexity": "low",
-        "modelTypes": ["fast_model", "multimodal_model"],
-        "tasks": ["general_conversation", "summarization", "extraction", "translation", "rewriting", "classification", "fact_lookup", "creative_generation"],
-        "strengths": ["fast", "cheap", "tool-use"],
+        "modelTypes": [
+          "fast_model",
+          "multimodal_model"
+        ],
+        "tasks": [
+          "general_conversation",
+          "summarization",
+          "extraction",
+          "translation",
+          "rewriting",
+          "classification",
+          "fact_lookup",
+          "creative_generation"
+        ],
+        "strengths": [
+          "fast",
+          "cheap",
+          "tool-use"
+        ],
         "costTier": "low",
         "latencyTier": "fast"
       }
@@ -116,12 +212,35 @@
         "toolUse": true,
         "streaming": true
       },
-      "cost": { "inputPer1M": 3.0, "outputPer1M": 15.0 },
+      "cost": {
+        "inputPer1M": 3,
+        "outputPer1M": 15
+      },
       "profile": {
         "complexity": "high",
-        "modelTypes": ["coding_model", "general_model", "reasoning_model", "multimodal_model"],
-        "tasks": ["code_generation", "debugging", "code_review", "code_refactoring", "technical_design", "analysis", "research", "document_generation", "creative_generation"],
-        "strengths": ["reasoning", "coding", "tool-use", "analysis"],
+        "modelTypes": [
+          "coding_model",
+          "general_model",
+          "reasoning_model",
+          "multimodal_model"
+        ],
+        "tasks": [
+          "code_generation",
+          "debugging",
+          "code_review",
+          "code_refactoring",
+          "technical_design",
+          "analysis",
+          "research",
+          "document_generation",
+          "creative_generation"
+        ],
+        "strengths": [
+          "reasoning",
+          "coding",
+          "tool-use",
+          "analysis"
+        ],
         "costTier": "standard",
         "latencyTier": "normal"
       }
@@ -137,12 +256,37 @@
         "toolUse": true,
         "streaming": true
       },
-      "cost": { "inputPer1M": 15.0, "outputPer1M": 75.0 },
+      "cost": {
+        "inputPer1M": 5,
+        "outputPer1M": 25
+      },
       "profile": {
         "complexity": "high",
-        "modelTypes": ["reasoning_model", "coding_model", "multimodal_model", "safety_specialized_model"],
-        "tasks": ["analysis", "logical_reasoning", "mathematics", "research", "decision_support", "planning", "code_generation", "debugging", "code_review", "technical_design"],
-        "strengths": ["reasoning", "coding", "tool-use", "analysis", "safety"],
+        "modelTypes": [
+          "reasoning_model",
+          "coding_model",
+          "multimodal_model",
+          "safety_specialized_model"
+        ],
+        "tasks": [
+          "analysis",
+          "logical_reasoning",
+          "mathematics",
+          "research",
+          "decision_support",
+          "planning",
+          "code_generation",
+          "debugging",
+          "code_review",
+          "technical_design"
+        ],
+        "strengths": [
+          "reasoning",
+          "coding",
+          "tool-use",
+          "analysis",
+          "safety"
+        ],
         "costTier": "premium",
         "latencyTier": "quality"
       }
@@ -158,12 +302,29 @@
         "toolUse": true,
         "streaming": true
       },
-      "cost": { "inputPer1M": 0.15, "outputPer1M": 0.60 },
+      "cost": {
+        "inputPer1M": 0.15,
+        "outputPer1M": 0.6
+      },
       "profile": {
         "complexity": "low",
-        "modelTypes": ["fast_model", "multimodal_model"],
-        "tasks": ["general_conversation", "fact_lookup", "summarization", "extraction", "classification", "translation", "rewriting"],
-        "strengths": ["fast", "cheap"],
+        "modelTypes": [
+          "fast_model",
+          "multimodal_model"
+        ],
+        "tasks": [
+          "general_conversation",
+          "fact_lookup",
+          "summarization",
+          "extraction",
+          "classification",
+          "translation",
+          "rewriting"
+        ],
+        "strengths": [
+          "fast",
+          "cheap"
+        ],
         "costTier": "budget",
         "latencyTier": "fast"
       }
@@ -179,12 +340,32 @@
         "toolUse": true,
         "streaming": true
       },
-      "cost": { "inputPer1M": 2.50, "outputPer1M": 10.0 },
+      "cost": {
+        "inputPer1M": 2.5,
+        "outputPer1M": 10
+      },
       "profile": {
         "complexity": "high",
-        "modelTypes": ["general_model", "coding_model", "multimodal_model"],
-        "tasks": ["code_generation", "debugging", "code_review", "analysis", "document_generation", "creative_generation", "general_conversation"],
-        "strengths": ["reasoning", "coding", "tool-use", "multimodal"],
+        "modelTypes": [
+          "general_model",
+          "coding_model",
+          "multimodal_model"
+        ],
+        "tasks": [
+          "code_generation",
+          "debugging",
+          "code_review",
+          "analysis",
+          "document_generation",
+          "creative_generation",
+          "general_conversation"
+        ],
+        "strengths": [
+          "reasoning",
+          "coding",
+          "tool-use",
+          "multimodal"
+        ],
         "costTier": "standard",
         "latencyTier": "normal"
       }
@@ -200,12 +381,30 @@
         "toolUse": true,
         "streaming": true
       },
-      "cost": { "inputPer1M": 0.15, "outputPer1M": 0.60 },
+      "cost": {
+        "inputPer1M": 0.15,
+        "outputPer1M": 0.6
+      },
       "profile": {
         "complexity": "low",
-        "modelTypes": ["fast_model", "multimodal_model", "long_context_model"],
-        "tasks": ["general_conversation", "fact_lookup", "summarization", "extraction", "classification", "translation"],
-        "strengths": ["fast", "cheap", "large-context"],
+        "modelTypes": [
+          "fast_model",
+          "multimodal_model",
+          "long_context_model"
+        ],
+        "tasks": [
+          "general_conversation",
+          "fact_lookup",
+          "summarization",
+          "extraction",
+          "classification",
+          "translation"
+        ],
+        "strengths": [
+          "fast",
+          "cheap",
+          "large-context"
+        ],
         "costTier": "budget",
         "latencyTier": "fast"
       }
@@ -221,12 +420,30 @@
         "toolUse": true,
         "streaming": true
       },
-      "cost": { "inputPer1M": 1.25, "outputPer1M": 10.0 },
+      "cost": {
+        "inputPer1M": 1.25,
+        "outputPer1M": 10
+      },
       "profile": {
         "complexity": "high",
-        "modelTypes": ["long_context_model", "reasoning_model", "multimodal_model"],
-        "tasks": ["analysis", "research", "summarization", "code_generation", "debugging", "document_generation"],
-        "strengths": ["reasoning", "large-context", "analysis"],
+        "modelTypes": [
+          "long_context_model",
+          "reasoning_model",
+          "multimodal_model"
+        ],
+        "tasks": [
+          "analysis",
+          "research",
+          "summarization",
+          "code_generation",
+          "debugging",
+          "document_generation"
+        ],
+        "strengths": [
+          "reasoning",
+          "large-context",
+          "analysis"
+        ],
         "costTier": "standard",
         "latencyTier": "normal"
       }
