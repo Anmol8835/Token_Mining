@@ -1,80 +1,6 @@
 {
   "models": [
     {
-      "id": "deepseek-chat",
-      "provider": "deepseek",
-      "apiModelId": "deepseek-chat",
-      "capabilities": {
-        "maxInputTokens": 65536,
-        "maxOutputTokens": 8192,
-        "vision": false,
-        "toolUse": true,
-        "streaming": true
-      },
-      "cost": {
-        "inputPer1M": 0.22,
-        "outputPer1M": 0.66
-      },
-      "profile": {
-        "complexity": "medium",
-        "modelTypes": [
-          "general_model",
-          "coding_model"
-        ],
-        "tasks": [
-          "general_conversation",
-          "code_generation",
-          "code_explanation",
-          "fact_lookup",
-          "explanation"
-        ],
-        "strengths": [
-          "fast",
-          "cheap",
-          "coding"
-        ],
-        "costTier": "budget",
-        "latencyTier": "normal"
-      }
-    },
-    {
-      "id": "deepseek-reasoner",
-      "provider": "deepseek",
-      "apiModelId": "deepseek-reasoner",
-      "capabilities": {
-        "maxInputTokens": 65536,
-        "maxOutputTokens": 8192,
-        "vision": false,
-        "toolUse": false,
-        "streaming": true
-      },
-      "cost": {
-        "inputPer1M": 0.55,
-        "outputPer1M": 2.19
-      },
-      "profile": {
-        "complexity": "high",
-        "modelTypes": [
-          "reasoning_model"
-        ],
-        "tasks": [
-          "mathematics",
-          "analysis",
-          "logical_reasoning",
-          "planning",
-          "decision_support",
-          "research"
-        ],
-        "strengths": [
-          "reasoning",
-          "math",
-          "analysis"
-        ],
-        "costTier": "budget",
-        "latencyTier": "quality"
-      }
-    },
-    {
       "id": "deepseek-v4-pro",
       "provider": "deepseek",
       "apiModelId": "deepseek-v4-pro",
@@ -121,9 +47,9 @@
       }
     },
     {
-      "id": "deepseek-v4-flash",
+      "id": "deepseek-flash",
       "provider": "deepseek",
-      "apiModelId": "deepseek-v4-flash",
+      "apiModelId": "deepseek-flash",
       "capabilities": {
         "maxInputTokens": 131072,
         "maxOutputTokens": 16384,
@@ -450,7 +376,7 @@
     }
   ],
   "defaults": {
-    "model": "deepseek-chat",
+    "model": "deepseek-flash",
     "maxTokens": 4096,
     "temperature": 1
   }

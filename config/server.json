@@ -3,7 +3,7 @@
     "mode": "auto",
     "cacheHours": 1,
     "cacheMaxEntries": 2000,
-    "llmClassifierModel": "deepseek-chat",
+    "llmClassifierModel": "deepseek-flash",
 
     "fusionConfidenceThreshold": 0.65,
 
@@ -30,8 +30,8 @@
   "router": {
     "costWeight": 0.3,
     "qualityWeight": 0.7,
-    "fallbackModel": "deepseek-v4-flash",
-    "providerFallbackChain": ["deepseek-v4-flash", "deepseek-chat", "deepseek-reasoner", "deepseek-v4-pro"],
+    "fallbackModel": "deepseek-flash",
+    "providerFallbackChain": ["deepseek-flash", "deepseek-v4-pro"],
     "defaultMode": "cheap"
   }
 }
