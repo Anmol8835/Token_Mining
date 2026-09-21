@@ -4,21 +4,17 @@
     "cacheHours": 1,
     "cacheMaxEntries": 2000,
     "llmClassifierModel": "deepseek-flash",
-
     "fusionConfidenceThreshold": 0.65,
-
     "fusionWeights": {
       "rule": 0.25,
-      "embedding": 0.30,
+      "embedding": 0.3,
       "profile": 0.15,
-      "llm": 0.30
+      "llm": 0.3
     },
-
     "embedding": {
       "minSimilarity": 0.25,
       "topK": 3
     },
-
     "profile": {
       "lowCharCount": 500,
       "highCharCount": 12000,
@@ -31,7 +27,40 @@
     "costWeight": 0.3,
     "qualityWeight": 0.7,
     "fallbackModel": "deepseek-flash",
-    "providerFallbackChain": ["deepseek-flash", "deepseek-v4-pro"],
+    "providerFallbackChain": [
+      "deepseek-flash",
+      "deepseek-v4-pro"
+    ],
     "defaultMode": "cheap"
+  },
+  "caching": {
+    "enabled": true,
+    "injectSystemBreakpoint": true,
+    "injectMultiTurnMarker": true,
+    "systemBreakpointMinTokens": {
+      "claude-haiku-4-5": 4096,
+      "claude-sonnet-5": 1024,
+      "claude-opus-4-8": 1024
+    },
+    "defaultMinTokens": 2048
+  },
+  "compaction": {
+    "enabled": true,
+    "thresholdPct": 0.75,
+    "targetPct": 0.45,
+    "minPct": 0.35,
+    "maxPct": 0.55,
+    "keepRecentExchanges": 8,
+    "minKeptExchanges": 1,
+    "toolHeadroomTokens": 8000,
+    "model": "deepseek-flash",
+    "maxTokens": 1500,
+    "temperature": 0,
+    "maxDroppedChars": 60000,
+    "timeoutMs": 15000,
+    "store": {
+      "ttlMinutes": 60,
+      "maxEntries": 500
+    }
   }
 }

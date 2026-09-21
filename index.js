@@ -11,7 +11,9 @@ const { selectModel } = require("./lib/router");
 const { toPublicShape } = require("./lib/classifier/taxonomy");
 const { getLastUserMessage, extractSystemText } = require("./lib/classifier/text-utils");
 const metrics = require("./lib/metrics");
+const prefs = require("./lib/prefs");
 const { runEvalSet } = require("./lib/eval");
+const { maybeCompact } = require("./lib/compaction");
 
 // ------------------------------------------------------------
 // Shared helpers
@@ -82,6 +84,19 @@ function loadConfig() {
           inputPer1M: price.inputPer1M,
           outputPer1M: price.outputPer1M,
           ...(price.peakMultiplier ? { peakMultiplier: price.peakMultiplier } : {}),
+          // Cache pricing. OpenAI-style providers (DeepSeek/OpenAI):
+          // cache HITS bill at a discounted input rate; misses at the
+          // full input rate; no write premium. Anthropic: reads/writes
+          // priced via multipliers on the base input rate.
+          ...(price.cacheHitInputPer1M ? { cacheHitInputPer1M: price.cacheHitInputPer1M } : {}),
+          ...(price.cacheReadMultiplier
+            ? {
+                cacheReadInputPer1M:
+                  Math.round(price.inputPer1M * price.cacheReadMultiplier * 1e6) / 1e6,
+                cacheWriteInputPer1M:
+                  Math.round(price.inputPer1M * price.cacheWriteMultiplier * 1e6) / 1e6,
+              }
+            : {}),
         };
       }
     }
@@ -122,9 +137,23 @@ const classifier = new HybridClassifier(serverConfig, registry);
 // ------------------------------------------------------------
 function costFor(model, usage) {
   if (!model?.cost || !usage) return null;
-  const inputCost = (usage.input_tokens || 0) * (model.cost.inputPer1M / 1e6);
-  const outputCost = (usage.output_tokens || 0) * (model.cost.outputPer1M / 1e6);
-  return Math.round((inputCost + outputCost) * 1e6) / 1e6; // USD, 6 dp
+  const input = usage.input_tokens || 0;
+  const output = usage.output_tokens || 0;
+  const read = usage.cache_read_input_tokens || 0;
+  const write = usage.cache_creation_input_tokens || 0;
+
+  // input_tokens is normalized to the FULL-rate remainder only
+  // (see converter.normalizeUsage). Cache reads price at the
+  // discounted rate; writes at the premium (Anthropic only —
+  // OpenAI-style providers' "creation" = misses already billed
+  // at full rate inside input_tokens, so their write price is 0).
+  const inputCost = input * (model.cost.inputPer1M / 1e6);
+  const outputCost = output * (model.cost.outputPer1M / 1e6);
+  const readCost = read * (
+    (model.cost.cacheReadInputPer1M ?? model.cost.cacheHitInputPer1M ?? model.cost.inputPer1M) / 1e6
+  );
+  const writeCost = write * ((model.cost.cacheWriteInputPer1M ?? 0) / 1e6);
+  return Math.round((inputCost + outputCost + readCost + writeCost) * 1e6) / 1e6; // USD, 6 dp
 }
 
 /**
@@ -135,7 +164,7 @@ function costFor(model, usage) {
  * NOTE: providers report ONE input-token total. The user/system
  * split here is estimated from character counts (~3.5 chars/token).
  */
-function logCostBreakdown({ systemText, servingAttempt, classifierCost, stream }) {
+function logCostBreakdown({ systemText, tools, messages, servingAttempt, classifierCost, stream, compaction }) {
   const usage = servingAttempt?.usage || null;
 
   if (!usage || (!usage.input_tokens && !usage.output_tokens)) {
@@ -155,30 +184,47 @@ function logCostBreakdown({ systemText, servingAttempt, classifierCost, stream }
 
   const input = usage.input_tokens || 0;
   const output = usage.output_tokens || 0;
-  const estSysTokens = Math.ceil((systemText?.length || 0) / 3.5);
+  // The compacted summary sits inside the system prompt — keep the
+  // debug user/system split honest by excluding it.
+  const summaryChars = compaction?.summaryCharLen || 0;
+  const estSysTokens = Math.max(0, Math.ceil(((systemText?.length || 0) - summaryChars) / 3.5));
   const estUserTokens = Math.max(0, input - estSysTokens);
+  // Tool/message payload size — for tool-heavy clients this dwarfs the
+  // system prompt and is otherwise invisible in this log.
+  const toolsChars = tools ? JSON.stringify(tools).length : 0;
+  const messagesChars = messages ? JSON.stringify(messages).length : 0;
+  const estToolTokens = Math.ceil(toolsChars / 3.5);
+  const estMsgTokens = Math.ceil(messagesChars / 3.5);
 
   const providerCost = servingAttempt?.costUsd || 0;
   const clsCost = classifierCost?.costUsd || 0;
-  const actual = providerCost + clsCost;
+  const compactionCostUsd = compaction?.costUsd || 0;
+  const actual = providerCost + clsCost + compactionCostUsd;
 
-  // Hypothetical: the SAME tokens priced on each baseline model.
+  // Hypothetical: the SAME token bundle (plain + cache) priced on
+  // each baseline model at its own cache rates (fair comparison).
   const hypo = (pricingConfig?.baselines || [])
     .map((b) => {
       const p = pricingConfig?.models?.[b.modelId];
       if (!p) return `${b.label}=?`;
-      const cost = (input * p.inputPer1M + output * p.outputPer1M) / 1e6;
+      const cost = metrics.hypotheticalCost(p, usage);
       return `${b.label}=$${cost.toFixed(6)}`;
     })
     .join(", ");
 
   console.log(
-    `💰 tokens: user≈${estUserTokens} + system≈${estSysTokens} (${systemText?.length || 0} chars) in / ${output} out`
+    `💰 tokens: user≈${estUserTokens} + system≈${estSysTokens} (${systemText?.length || 0} chars)` +
+    (estToolTokens ? ` + tools≈${estToolTokens} (${toolsChars} chars)` : "") +
+    (estMsgTokens ? ` + history≈${estMsgTokens} (${messagesChars} chars)` : "") +
+    ` in / ${output} out`
   );
   console.log(
-    `   cost: providers $${providerCost.toFixed(6)} + classifier $${clsCost.toFixed(6)} = $${actual.toFixed(6)}` +
+    `   cost: providers $${providerCost.toFixed(6)} + classifier $${clsCost.toFixed(6)}` +
+    (compactionCostUsd ? ` + compaction $${compactionCostUsd.toFixed(6)}` : "") +
+    ` = $${actual.toFixed(6)}` +
     (hypo ? ` | hypothetical: ${hypo}` : "") +
-    (clsCost ? ` | classifier: ${classifierCost.inputTokens} in / ${classifierCost.outputTokens} out` : "")
+    (clsCost ? ` | classifier: ${classifierCost.inputTokens} in / ${classifierCost.outputTokens} out` : "") +
+    ` | cache: read=${usage.cache_read_input_tokens || 0} write=${usage.cache_creation_input_tokens || 0}`
   );
 }
 
@@ -187,6 +233,10 @@ function logCostBreakdown({ systemText, servingAttempt, classifierCost, stream }
 // ============================================================
 
 async function callProvider(provider, nativePayload, stream, res, modelId, extraResponseFields) {
+  // NOTE: a TEMP DEBUG block here dumped every outgoing payload to
+  // system.txt. Removed 2026-09-21 after it leaked API keys into a
+  // commit (blocked by GitHub secret scanning).
+
   if (stream) {
     res.setHeader("Content-Type", "text/event-stream");
     res.setHeader("Cache-Control", "no-cache");
@@ -228,14 +278,46 @@ async function callProvider(provider, nativePayload, stream, res, modelId, extra
     });
 
     const converted = provider.convertResponse(response.data, modelId);
-    // Non-streaming responses can carry the classification in-band
-    // when debug was requested.
-    if (extraResponseFields) {
-      converted._classification = extraResponseFields;
+    // Non-streaming responses can carry bookkeeping in-band when
+    // debug was requested (classification + compaction).
+    if (extraResponseFields?.classification) {
+      converted._classification = extraResponseFields.classification;
+    }
+    if (extraResponseFields?.compaction) {
+      converted._compaction = extraResponseFields.compaction;
     }
     res.json(converted);
     return converted; // includes usage, used for cost accounting
   }
+}
+
+/**
+ * Pull a readable error message out of a failed provider call.
+ * Streaming requests use responseType "stream", so error bodies arrive
+ * as a Node stream — read it rather than stringify the stream object
+ * (which produced unreadable "_writeState" dumps in the logs).
+ */
+async function extractErrorDetail(err) {
+  try {
+    const data = err?.response?.data;
+    if (data && typeof data.on === "function") {
+      let chunks = "";
+      for await (const chunk of data) chunks += chunk;
+      try {
+        const parsed = JSON.parse(chunks);
+        return parsed?.error?.message || parsed?.message || chunks.slice(0, 300);
+      } catch (_) {
+        return chunks.slice(0, 300);
+      }
+    }
+    if (data?.error?.message) return data.error.message;
+    if (data?.message) return data.message;
+    if (typeof data === "string") return data.slice(0, 300);
+    if (data) return JSON.stringify(data).slice(0, 300);
+  } catch (_) {
+    /* fall through to err.message */
+  }
+  return err?.message || "unknown error";
 }
 
 // ============================================================
@@ -266,6 +348,8 @@ app.post("/v1/classify", async (req, res) => {
     // DEBUG: classifier-only cost breakdown.
     logCostBreakdown({
       systemText: extractSystemText(req.body.system),
+      tools: req.body.tools,
+      messages: req.body.messages,
       servingAttempt: null,
       classifierCost: classification.metadata?.classifierCost || null,
       stream: false,
@@ -328,11 +412,17 @@ app.post("/v1/messages", async (req, res) => {
 
       // Parse routing mode from header (cost-reduction aware)
       // X-Routing-Mode: cheap | fast | balanced | quality
-      const routingMode = (req.headers["x-routing-mode"] || "cheap").toLowerCase();
+      // Header wins; otherwise the dashboard-configured default.
+      const routingMode = (
+        req.headers["x-routing-mode"] || prefs.getRoutingMode() || "cheap"
+      ).toLowerCase();
       const validModes = ["cheap", "fast", "balanced", "quality"];
       const effectiveMode = validModes.includes(routingMode) ? routingMode : "cheap";
 
-      routeResult = selectModel(classification, registry, serverConfig.router, null, effectiveMode);
+      routeResult = selectModel(
+        classification, registry, serverConfig.router, null,
+        effectiveMode, prefs.getDisabledModels()
+      );
       selectedModel = routeResult.model;
 
       // Surface the classification: always as a header, and in the
@@ -354,7 +444,42 @@ app.post("/v1/messages", async (req, res) => {
       });
     }
 
+    // --- Step 2.5: Rolling prompt compaction (context-budget guard) ---
+    // Runs before the native payload is built so the fallback chain
+    // (which spreads req.body) reuses the compacted body, and so an
+    // injected cache breakpoint lands on the final system block (the
+    // frozen summary when present). On failure the request proceeds
+    // uncompacted.
+    let compactionResult = null;
+    let compactionCost = null;
+    if (serverConfig.compaction?.enabled !== false) {
+      try {
+        compactionResult = await maybeCompact(req.body, { serverConfig, registry, selectedModel });
+        if (compactionResult) {
+          compactionCost = compactionResult.costUsd != null
+            ? {
+                model: serverConfig.compaction?.model || "deepseek-flash",
+                costUsd: compactionResult.costUsd,
+              }
+            : null;
+          console.log(
+            `  ✂️ compaction: dropped ${compactionResult.droppedCount} msgs, ` +
+            `${compactionResult.tokensBefore}→${compactionResult.tokensAfter} tokens est. ` +
+            `(${compactionResult.reused ? "reused summary" : "new summary"}` +
+            (compactionCost ? `, $${compactionCost.costUsd.toFixed(6)}` : "") + `)`
+          );
+          metrics.recordCompaction(compactionResult, compactionCost);
+        }
+      } catch (err) {
+        console.warn(`[compaction] skipped: ${err.message}`);
+      }
+    }
+
     // --- Step 3: Build native request ---
+    const extraResponseFields = {
+      classification: classificationPayloadForResponse,
+      compaction: debug && compactionResult ? compactionResult : null,
+    };
     const nativePayload = provider.buildRequest({
       ...req.body,
       model: selectedModel.apiModelId,
@@ -377,22 +502,16 @@ app.post("/v1/messages", async (req, res) => {
     let fallbacksUsed = 0;
     let callStart = Date.now();
     try {
-      const converted = await callProvider(provider, nativePayload, stream, res, selectedModel.id, classificationPayloadForResponse);
+      const converted = await callProvider(provider, nativePayload, stream, res, selectedModel.id, extraResponseFields);
       recordAttempt(selectedModel, callStart, converted, true);
     } catch (providerErr) {
       recordAttempt(selectedModel, callStart, null, false);
       // Primary provider failed — try fallback chain
       const fallbackChain = serverConfig.router?.providerFallbackChain || [];
-      const apiErrMsg =
-        providerErr.response?.data?.error?.message ||
-        providerErr.response?.data?.message ||
-        providerErr.response?.data ||
-        providerErr.message;
+      const apiErrMsg = await extractErrorDetail(providerErr);
       console.warn(
         `Provider ${selectedModel.provider} failed: ${providerErr.message}` +
-        (apiErrMsg && apiErrMsg !== providerErr.message
-          ? ` — ${typeof apiErrMsg === "string" ? apiErrMsg : JSON.stringify(apiErrMsg).slice(0, 300)}`
-          : "")
+        (apiErrMsg && apiErrMsg !== providerErr.message ? ` — ${apiErrMsg}` : "")
       );
 
       let fallbackSuccess = false;
@@ -415,7 +534,7 @@ app.post("/v1/messages", async (req, res) => {
             model: fallbackModel.apiModelId,
           });
 
-          const fbConverted = await callProvider(fallbackProvider, fallbackPayload, stream, res, fallbackModel.id, classificationPayloadForResponse);
+          const fbConverted = await callProvider(fallbackProvider, fallbackPayload, stream, res, fallbackModel.id, extraResponseFields);
           recordAttempt(fallbackModel, callStart, fbConverted, true);
           fallbackSuccess = true;
           break;
@@ -426,9 +545,7 @@ app.post("/v1/messages", async (req, res) => {
 
       if (!fallbackSuccess && !res.headersSent) {
         const errStatus = providerErr.response?.status || 502;
-        const errMsg = providerErr.response?.data?.error?.message
-          || providerErr.response?.data
-          || providerErr.message;
+        const errMsg = await extractErrorDetail(providerErr);
 
         res.status(errStatus).json({
           type: "error",
@@ -452,14 +569,18 @@ app.post("/v1/messages", async (req, res) => {
         route: routeResult,
         providerFallbacks: fallbacksUsed,
         providerResult: servingAttempt,
+        compaction: compactionResult,
       });
 
       // DEBUG: token + cost breakdown for this request.
       logCostBreakdown({
         systemText: extractSystemText(req.body.system),
+        tools: req.body.tools,
+        messages: req.body.messages,
         servingAttempt,
         classifierCost: classification.metadata?.classifierCost || null,
         stream,
+        compaction: compactionResult,
       });
     }
 
@@ -557,7 +678,7 @@ app.post("/metrics/demo", async (req, res) => {
 
       const route = selectModel(
         classification, registry, serverConfig.router, null,
-        modes[demoIdx % modes.length]
+        modes[demoIdx % modes.length], prefs.getDisabledModels()
       );
       demoIdx++;
 
@@ -592,6 +713,93 @@ app.post("/metrics/demo", async (req, res) => {
 });
 
 // ============================================================
+// Dashboard config endpoints — model selection + routing mode
+// Consumed by the Next.js dashboard; prefs persist in data/.
+// ============================================================
+
+function dashboardCatalog() {
+  // Static display data: router policy + benchmark report (may not exist).
+  let policy = null;
+  let benchmark = null;
+  try {
+    policy = JSON.parse(
+      fs.readFileSync(path.join(__dirname, "config", "router-policy.json"), "utf8")
+    );
+  } catch (_) {}
+  try {
+    benchmark = JSON.parse(
+      fs.readFileSync(
+        path.join(__dirname, "benchmark", "data", "report", "report.json"),
+        "utf8"
+      )
+    );
+  } catch (_) {}
+
+  // All configured models, with provider availability. Unavailable
+  // providers (missing API key) can't serve traffic, so they read as
+  // disabled in the UI even though they aren't in the prefs file.
+  const models = Array.from(registry.models.values()).map((m) => ({
+    id: m.id,
+    provider: m.provider,
+    apiModelId: m.apiModelId,
+    cost: m.cost,
+    capabilities: m.capabilities,
+    profile: m.profile,
+    available: !!registry.getProvider(m.id),
+    enabled: !!registry.getProvider(m.id) && prefs.isModelEnabled(m.id),
+  }));
+
+  return {
+    models,
+    prefs: {
+      routingMode: prefs.getRoutingMode(),
+      disabledModels: prefs.getDisabledModels(),
+    },
+    routingModes: prefs.VALID_MODES,
+    policy,
+    benchmark,
+  };
+}
+
+app.get("/config/dashboard", (req, res) => {
+  res.json(dashboardCatalog());
+});
+
+// Toggle a model in/out of the auto-routing candidate pool.
+app.post("/config/models", (req, res) => {
+  const { id, enabled } = req.body || {};
+  if (typeof id !== "string" || typeof enabled !== "boolean") {
+    return res
+      .status(400)
+      .json({ ok: false, error: "Body needs { id: string, enabled: boolean }" });
+  }
+  if (!registry.getModel(id)) {
+    return res.status(404).json({ ok: false, error: `Unknown model "${id}"` });
+  }
+  const availableIds = registry
+    .getAllModels()
+    .map((m) => m.id);
+  const result = prefs.setModelEnabled(id, enabled, availableIds);
+  if (!result.ok) {
+    return res.status(400).json(result);
+  }
+  res.json({ ok: true, catalog: dashboardCatalog() });
+});
+
+// Set the default routing mode (cheap | fast | balanced | quality).
+app.post("/config/routing", (req, res) => {
+  const { mode } = req.body || {};
+  const updated = prefs.setRoutingMode(mode);
+  if (updated === null) {
+    return res.status(400).json({
+      ok: false,
+      error: `mode must be one of: ${prefs.VALID_MODES.join(", ")}`,
+    });
+  }
+  res.json({ ok: true, routingMode: updated });
+});
+
+// ============================================================
 // Start
 // ============================================================
 
@@ -601,6 +809,9 @@ app.listen(PORT, () => {
   console.log(`   POST /v1/classify    — Prompt classification (JSON only)`);
   console.log(`   GET  /               — Routing metrics dashboard`);
   console.log(`   GET  /metrics        — Metrics JSON`);
+  console.log(`   GET  /config/dashboard — Model catalog + routing prefs`);
+  console.log(`   POST /config/models  — Enable/disable a model`);
+  console.log(`   POST /config/routing — Set default routing mode`);
   console.log(`   POST /metrics/eval   — Run classifier eval set`);
   console.log(`   GET  /health         — Server status\n`);
 });
