@@ -219,6 +219,11 @@
     </div>
 
     <div class="panel">
+      <h2>Cache &amp; compaction <span class="sub" style="text-transform:none">(prefix-cache accounting)</span></h2>
+      <div id="cachePanel"><div class="empty">no data yet</div></div>
+    </div>
+
+    <div class="panel">
       <h2>Cost vs fixed-model baselines <span class="sub" style="text-transform:none">(same tokens, one model always)</span></h2>
       <div id="costPanel"><div class="empty">no data yet</div></div>
     </div>
@@ -253,10 +258,10 @@
               <th>time</th><th>prompt</th><th>task</th><th>domain</th>
               <th>risk</th><th>model_type</th><th>selected</th>
               <th class="num">conf</th><th class="num">class ms</th>
-              <th class="num">prov ms</th><th class="num">tokens</th><th class="num">cost</th><th>status</th>
+              <th class="num">prov ms</th><th class="num">tokens</th><th class="num">cache in</th><th class="num">compact</th><th class="num">cost</th><th>status</th>
             </tr>
           </thead>
-          <tbody id="recentBody"><tr><td colspan="13" class="empty">no data yet</td></tr></tbody>
+          <tbody id="recentBody"><tr><td colspan="15" class="empty">no data yet</td></tr></tbody>
         </table>
       </div>
     </div>
@@ -334,6 +339,23 @@ function render() {
     k: m.key, v: m.count, title: m.key + ": " + m.count + " req, " + fmtUsd(m.costUsd),
     suffix: " · " + fmtUsd(m.costUsd),
   })));
+
+  /* cache + compaction accounting */
+  {
+    const t = s.totals;
+    const cacheRows = [
+      { k: "Cache reads", v: t.cacheReadTokens.toLocaleString() + " tok" },
+      { k: "Cache writes", v: t.cacheWriteTokens.toLocaleString() + " tok" },
+      { k: "Cache savings", v: fmtUsd(t.cacheSavingsUsd) },
+      { k: "Compaction calls", v: t.compactionCalls + " · " + fmtUsd(t.compactionCostUsd) },
+      { k: "Tokens freed (est.)", v: t.compactionTokensSaved.toLocaleString() },
+    ];
+    $("cachePanel").innerHTML = cacheRows.map((r) => `
+      <div class="bar-row" style="grid-template-columns:1fr auto">
+        <div class="name">${esc(r.k)}</div>
+        <div class="val">${esc(r.v)}</div>
+      </div>`).join("");
+  }
 
   /* cost vs fixed-model baselines */
   const baselines = s.costBaselines || [];
@@ -497,6 +519,8 @@ function render() {
       <td class="num">${r.classifierMs ?? "–"}</td>
       <td class="num">${r.providerMs ?? "–"}</td>
       <td class="num">${r.tokens ?? "–"}</td>
+      <td class="num" title="cache-hit input tokens on this request">${r.cacheReadTokens != null ? r.cacheReadTokens.toLocaleString() : "–"}</td>
+      <td class="num" title="messages dropped by compaction">${r.compactionDroppedMsgs != null ? "✂ " + r.compactionDroppedMsgs : "–"}</td>
       <td class="num" title="${r.classifierCostUsd ? "provider $" + (r.costUsd != null ? r.costUsd.toFixed(4) : "0") + " + classifier $" + r.classifierCostUsd.toFixed(4) : ""}">${
         r.costUsd != null
           ? ((r.costUsd + (r.classifierCostUsd || 0)).toFixed(4))
@@ -504,7 +528,7 @@ function render() {
       }</td>
       <td>${r.ok === false ? '<span class="risk high"><i></i>failed</span>' : (r.ok === null ? "–" : '<span class="risk low"><i></i>ok</span>')}</td>
     </tr>`).join("")
-    : '<tr><td colspan="13" class="empty">no requests recorded yet</td></tr>';
+    : '<tr><td colspan="15" class="empty">no requests recorded yet</td></tr>';
 }
 
 async function poll() {

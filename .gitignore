@@ -1,3 +1,8 @@
 .env
 node_modules/
 data/
+benchmark/data/
+benchmark/.venv/
+
+# Debug payload dump (was temp debug; contains raw request bodies)
+system.txt

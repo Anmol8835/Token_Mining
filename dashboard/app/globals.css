@@ -1,0 +1,177 @@
+@import "tailwindcss";
+
+/*
+ * Design read (design-taste-frontend skill, section 0.B):
+ * "Reading this as: developer-tool analytics dashboard for a solo
+ * LLM-infra operator, with a dark-tech console language, leaning
+ * toward Tailwind v4 + custom SVG charts + Geist/Geist Mono +
+ * Phosphor icons."
+ *
+ * Dials (skill section 1): VARIANCE 4 / MOTION 3 / DENSITY 6.
+ * The skill marks dashboards out of scope (section 13); the rules
+ * applied here are the transferable ones: typography (Geist, no
+ * Inter), one accent color, one radius scale, one icon family,
+ * dual theme with reduced-motion care, zero em-dashes in copy,
+ * no pure black/white, no neon glows. Chart marks and palettes
+ * follow the dataviz skill instead.
+ *
+ * Accent: burgundy (user-requested). It replaces the default
+ * blue slot, which forced a re-ordered series theme because no
+ * burgundy step separates from orange (same warm family, normal
+ * vision floor Delta E < 15) when they sit adjacent. The order
+ * below is the validated passing order: [burgundy, yellow,
+ * magenta, green, red, violet, aqua, orange]. Both modes pass
+ * the six checks (light: worst pair Delta E 7.2, in the legal
+ * 6-8 floor band with secondary encoding; dark: all hard gates
+ * clear). Do not "fix" this order back to the default.
+ *
+ * Design tokens: one theme system for the whole console.
+ *
+ * Light + dark values for every token live in :root / [data-theme="dark"];
+ * the pre-paint script in layout.tsx picks the mode from localStorage
+ * (falling back to prefers-color-scheme) before first render, so there
+ * is no flash. UI accent and chart series share the same slots: the
+ * burgundy accent IS series-1, so charts and controls never disagree.
+ *
+ * Chart palette: the dataviz skill's validated palette re-themed on
+ * burgundy (light + dark steps), run through scripts/validate_palette.js.
+ *
+ * Radius scale (one system, documented):
+ *   panels/cards 12px, buttons/inputs 8px, pills/toggles full
+ */
+
+@theme inline {
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, "SFMono-Regular", monospace;
+
+  --color-page: var(--page);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-ink-3: var(--ink-3);
+  --color-line: var(--line);
+  --color-hairline: var(--hairline);
+  --color-accent: var(--accent);
+  --color-on-accent: var(--on-accent);
+  --color-accent-ink: var(--accent-ink);
+
+  --color-series-1: var(--series-1);
+  --color-series-2: var(--series-2);
+  --color-series-3: var(--series-3);
+  --color-series-4: var(--series-4);
+  --color-series-5: var(--series-5);
+  --color-series-6: var(--series-6);
+  --color-series-7: var(--series-7);
+  --color-series-8: var(--series-8);
+
+  --color-good: var(--good);
+  --color-warning: var(--warning);
+  --color-serious: var(--serious);
+  --color-critical: var(--critical);
+  --color-up: var(--up);
+}
+
+:root {
+  color-scheme: light;
+
+  --page: #f9f9f7;
+  --surface: #fcfcfb;
+  --surface-2: #f2f1ec;
+  --ink: #0b0b0b;
+  --ink-2: #52514e;
+  --ink-3: #898781;
+  --line: #e1e0d9;
+  --hairline: rgba(11, 11, 11, 0.1);
+  --accent: #98384a;
+  --on-accent: #ffffff;
+  --accent-ink: #98384a;
+
+  --series-1: #98384a;
+  --series-2: #eda100;
+  --series-3: #e87ba4;
+  --series-4: #008300;
+  --series-5: #e34948;
+  --series-6: #4a3aa7;
+  --series-7: #1baf7a;
+  --series-8: #eb6834;
+
+  --good: #0ca30c;
+  --warning: #fab219;
+  --serious: #ec835a;
+  --critical: #d03b3b;
+  --up: #006300;
+}
+
+[data-theme="dark"] {
+  color-scheme: dark;
+
+  --page: #0d0d0d;
+  --surface: #1a1a19;
+  --surface-2: #222220;
+  --ink: #ffffff;
+  --ink-2: #c3c2b7;
+  --ink-3: #898781;
+  --line: #2c2c2a;
+  --hairline: rgba(255, 255, 255, 0.1);
+  --accent: #ab4d61;
+  --on-accent: #ffffff;
+  --accent-ink: #ce7a8b;
+
+  --series-1: #ab4d61;
+  --series-2: #c98500;
+  --series-3: #d55181;
+  --series-4: #008300;
+  --series-5: #e66767;
+  --series-6: #9085e9;
+  --series-7: #199e70;
+  --series-8: #d95926;
+
+  --good: #0ca30c;
+  --warning: #fab219;
+  --serious: #ec835a;
+  --critical: #d03b3b;
+  --up: #0ca30c;
+}
+
+body {
+  background: var(--page);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Reserve the scrollbar gutter so expanding panels (which grow the
+ * page past the viewport) never shifts the layout when the scrollbar
+ * appears or disappears. */
+html {
+  scrollbar-gutter: stable;
+}
+
+::selection {
+  background: color-mix(in srgb, var(--accent) 25%, transparent);
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  /* Hover states only; no autoplay animation in this console. */
+  .hover-lift {
+    transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  .hover-lift:hover {
+    transform: translateY(-1px);
+  }
+  .hover-lift:active {
+    transform: translateY(0) scale(0.98);
+  }
+}
+
+/* Numeric alignment lives where it matters: table cells and axes. */
+.tnum {
+  font-variant-numeric: tabular-nums;
+}
