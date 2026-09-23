@@ -385,6 +385,18 @@ app.post("/v1/messages", async (req, res) => {
       req.headers["x-debug"] === "1" ||
       req.body.debug === true;
 
+    // DEBUG dump: the COMPLETE request as received, before any
+    // classification, compaction or provider conversion. This is the
+    // router's whole input, byte for byte. system.txt is gitignored —
+    // raw payloads must never enter the repo (see the 2026-09-21
+    // secret-scan incident).
+    fs.appendFileSync(
+      path.join(__dirname, "system.txt"),
+      `\n=== IN ${new Date().toISOString()} model=${modelName} ${stream ? "stream" : "non-stream"}` +
+        ` mode=${(req.headers["x-routing-mode"] || "default").toLowerCase()} ===\n` +
+        JSON.stringify(req.body, null, 2) + "\n"
+    );
+
     let selectedModel;
     let classification = null;
     let classificationPayloadForResponse = null;
