@@ -7,8 +7,10 @@
     "claude-haiku-4-5":  { "inputPer1M": 1.00, "outputPer1M": 5.00,  "cacheReadMultiplier": 0.1, "cacheWriteMultiplier": 2, "notes": "Claude Haiku 4.5" },
     "claude-sonnet-5":   { "inputPer1M": 3.00, "outputPer1M": 15.00, "cacheReadMultiplier": 0.1, "cacheWriteMultiplier": 2, "notes": "Claude Sonnet 4.6" },
     "claude-opus-4-8":   { "inputPer1M": 5.00, "outputPer1M": 25.00, "cacheReadMultiplier": 0.1, "cacheWriteMultiplier": 2, "notes": "Claude Opus 4.8" },
-    "gpt-4o-mini":       { "inputPer1M": 0.15, "outputPer1M": 0.60,  "notes": "OpenAI GPT-4o mini (last known)" },
-    "gpt-4o":            { "inputPer1M": 2.50, "outputPer1M": 10.00, "notes": "OpenAI GPT-4o (last known)" },
+    "gpt-6-astra":       { "inputPer1M": 10.00, "outputPer1M": 50.00, "notes": "OpenAI GPT-6 Astra" },
+    "gpt-5.6-sol":       { "inputPer1M": 4.00,  "outputPer1M": 20.00, "notes": "OpenAI GPT-5.6 Sol" },
+    "gpt-5.6-terra":     { "inputPer1M": 2.00,  "outputPer1M": 12.00, "notes": "OpenAI GPT-5.6 Terra" },
+    "gpt-5.6-luna":      { "inputPer1M": 0.20,  "outputPer1M": 1.20,  "notes": "OpenAI GPT-5.6 Luna" },
     "gemini-2.5-flash":  { "inputPer1M": 0.15, "outputPer1M": 0.60,  "notes": "Gemini 2.5 Flash (last known)" },
     "gemini-2.5-pro":    { "inputPer1M": 1.25, "outputPer1M": 10.00, "notes": "Gemini 2.5 Pro (last known)" }
   },

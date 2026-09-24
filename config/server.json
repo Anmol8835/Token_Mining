@@ -1,6 +1,6 @@
 {
   "classifier": {
-    "mode": "auto",
+    "mode": "llm",
     "cacheHours": 1,
     "cacheMaxEntries": 2000,
     "llmClassifierModel": "deepseek-flash",

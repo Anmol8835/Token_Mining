@@ -218,25 +218,164 @@
       }
     },
     {
-      "id": "gpt-4o-mini",
+      "id": "gpt-6-astra",
       "provider": "openai",
-      "apiModelId": "gpt-4o-mini",
+      "apiModelId": "gpt-6-astra",
+      "notes": "toolUse=false for this proxy: /v1/chat/completions rejects function tools on this model (tools need /v1/responses)",
       "capabilities": {
-        "maxInputTokens": 128000,
-        "maxOutputTokens": 16384,
+        "maxInputTokens": 1050000,
+        "maxOutputTokens": 128000,
+        "vision": true,
+        "toolUse": false,
+        "streaming": true
+      },
+      "cost": {
+        "inputPer1M": 10,
+        "outputPer1M": 50
+      },
+      "profile": {
+        "complexity": "high",
+        "modelTypes": [
+          "general_model",
+          "coding_model",
+          "reasoning_model",
+          "multimodal_model",
+          "long_context_model"
+        ],
+        "tasks": [
+          "code_generation",
+          "debugging",
+          "code_review",
+          "technical_design",
+          "analysis",
+          "research",
+          "document_generation",
+          "planning"
+        ],
+        "strengths": [
+          "reasoning",
+          "coding",
+          "tool-use",
+          "analysis",
+          "vision",
+          "large-context"
+        ],
+        "costTier": "premium",
+        "latencyTier": "quality"
+      }
+    },
+    {
+      "id": "gpt-5.6-sol",
+      "provider": "openai",
+      "apiModelId": "gpt-5.6-sol",
+      "capabilities": {
+        "maxInputTokens": 1050000,
+        "maxOutputTokens": 128000,
         "vision": true,
         "toolUse": true,
         "streaming": true
       },
       "cost": {
-        "inputPer1M": 0.15,
-        "outputPer1M": 0.6
+        "inputPer1M": 4,
+        "outputPer1M": 20
+      },
+      "profile": {
+        "complexity": "high",
+        "modelTypes": [
+          "general_model",
+          "coding_model",
+          "reasoning_model",
+          "multimodal_model",
+          "long_context_model"
+        ],
+        "tasks": [
+          "code_generation",
+          "debugging",
+          "code_review",
+          "technical_design",
+          "analysis",
+          "research",
+          "document_generation",
+          "general_conversation"
+        ],
+        "strengths": [
+          "reasoning",
+          "coding",
+          "tool-use",
+          "analysis",
+          "vision",
+          "large-context"
+        ],
+        "costTier": "premium",
+        "latencyTier": "quality"
+      }
+    },
+    {
+      "id": "gpt-5.6-terra",
+      "provider": "openai",
+      "apiModelId": "gpt-5.6-terra",
+      "capabilities": {
+        "maxInputTokens": 1050000,
+        "maxOutputTokens": 128000,
+        "vision": true,
+        "toolUse": true,
+        "streaming": true
+      },
+      "cost": {
+        "inputPer1M": 2,
+        "outputPer1M": 12
+      },
+      "profile": {
+        "complexity": "high",
+        "modelTypes": [
+          "general_model",
+          "coding_model",
+          "reasoning_model",
+          "multimodal_model",
+          "long_context_model"
+        ],
+        "tasks": [
+          "code_generation",
+          "debugging",
+          "analysis",
+          "research",
+          "summarization",
+          "document_generation",
+          "general_conversation"
+        ],
+        "strengths": [
+          "reasoning",
+          "coding",
+          "tool-use",
+          "vision",
+          "large-context"
+        ],
+        "costTier": "standard",
+        "latencyTier": "normal"
+      }
+    },
+    {
+      "id": "gpt-5.6-luna",
+      "provider": "openai",
+      "apiModelId": "gpt-5.6-luna",
+      "capabilities": {
+        "maxInputTokens": 1050000,
+        "maxOutputTokens": 128000,
+        "vision": true,
+        "toolUse": true,
+        "streaming": true
+      },
+      "cost": {
+        "inputPer1M": 0.2,
+        "outputPer1M": 1.2
       },
       "profile": {
         "complexity": "low",
         "modelTypes": [
           "fast_model",
-          "multimodal_model"
+          "reasoning_model",
+          "multimodal_model",
+          "long_context_model"
         ],
         "tasks": [
           "general_conversation",
@@ -248,52 +387,13 @@
           "rewriting"
         ],
         "strengths": [
-          "fast",
-          "cheap"
+          "cheap",
+          "tool-use",
+          "vision",
+          "large-context"
         ],
         "costTier": "budget",
         "latencyTier": "fast"
-      }
-    },
-    {
-      "id": "gpt-4o",
-      "provider": "openai",
-      "apiModelId": "gpt-4o",
-      "capabilities": {
-        "maxInputTokens": 128000,
-        "maxOutputTokens": 16384,
-        "vision": true,
-        "toolUse": true,
-        "streaming": true
-      },
-      "cost": {
-        "inputPer1M": 2.5,
-        "outputPer1M": 10
-      },
-      "profile": {
-        "complexity": "high",
-        "modelTypes": [
-          "general_model",
-          "coding_model",
-          "multimodal_model"
-        ],
-        "tasks": [
-          "code_generation",
-          "debugging",
-          "code_review",
-          "analysis",
-          "document_generation",
-          "creative_generation",
-          "general_conversation"
-        ],
-        "strengths": [
-          "reasoning",
-          "coding",
-          "tool-use",
-          "multimodal"
-        ],
-        "costTier": "standard",
-        "latencyTier": "normal"
       }
     },
     {
