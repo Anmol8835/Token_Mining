@@ -513,7 +513,20 @@ app.post("/v1/messages", async (req, res) => {
 
     let fallbacksUsed = 0;
     let callStart = Date.now();
+    // gpt-6 models cannot serve function tools via /v1/chat/completions
+    // (tools require /v1/responses there, and reasoning_effort has no
+    // "none" value). Fail over to the fallback chain up front instead
+    // of burning an API call on a guaranteed 400.
+    const toolsIncompatible =
+      /^gpt-6/.test(selectedModel.id) &&
+      Array.isArray(req.body.tools) &&
+      req.body.tools.length > 0;
     try {
+      if (toolsIncompatible) {
+        throw new Error(
+          "gpt-6 cannot serve tools via chat/completions (needs /v1/responses); using fallback chain"
+        );
+      }
       const converted = await callProvider(provider, nativePayload, stream, res, selectedModel.id, extraResponseFields);
       recordAttempt(selectedModel, callStart, converted, true);
     } catch (providerErr) {
