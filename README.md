@@ -23,6 +23,7 @@ Requirements: Node 22+, API keys in `.env` (gitignored):
 CLAUDE_API_KEY=sk-ant-...      # or ANTHROPIC_API_KEY
 DEEPSEEK_API_KEY=sk-...
 # optional: OPENAI_API_KEY, GOOGLE_API_KEY or GEMINI_API_KEY
+TYPESAFE_API_KEY=...           # optional: "jev" classifier mode (console.typesafe.ai/keys)
 ```
 
 ```bash
@@ -53,6 +54,16 @@ Open http://localhost:3000. Hit "Generate demo traffic" on the Overview page to 
 | `POST /config/routing` | `{mode}` - set the default routing mode |
 
 **Routing mode:** `X-Routing-Mode: cheap | fast | balanced | quality` per request; otherwise the dashboard-configured default (`data/dashboard-prefs.json`), then `cheap`. Note: when `classifier.mode` is `"auto"` in config/server.json, named models are ignored and every request is classified + routed (this is the cost-saving default).
+
+**Classifier modes** (`classifier.mode` in config/server.json):
+
+| Mode | Behavior |
+|---|---|
+| `auto` | Full hybrid pipeline: rules + embedding + profile fused, LLM fallback on low confidence, results cached |
+| `llm` | LLM classifier only (temporary test mode; bypasses cache and the free signals) |
+| `jev` | TypeSafe Jev classifier only (docs.typesafe.ai): one typed-Choice call to `api.typesafe.ai`, bypasses cache/fusion/LLM fallback. Requires `TYPESAFE_API_KEY` |
+
+In any non-`auto` mode a client-sent model name bypasses classification entirely. Jev caveats: TypeSafe publishes no pricing, so its `costUsd` records as 0 and its tokens are not aggregated into cost sums; a failed Jev call degrades to a safe default classification (confidence 0.15, task "other") instead of returning 500; multi-step-pipeline detection is weaker than the hybrid (no `secondary_tasks` question).
 
 ## Configuration
 

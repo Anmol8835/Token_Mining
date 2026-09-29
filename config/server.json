@@ -1,6 +1,6 @@
 {
   "classifier": {
-    "mode": "llm",
+    "mode": "jev",
     "cacheHours": 1,
     "cacheMaxEntries": 2000,
     "llmClassifierModel": "deepseek-flash",
@@ -21,6 +21,10 @@
       "deepConversation": 8,
       "longSystemPrompt": 3000,
       "largeInputChars": 20000
+    },
+    "jev": {
+      "model": "jev-latest",
+      "timeoutMs": 5000
     }
   },
   "router": {
