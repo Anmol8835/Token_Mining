@@ -35,7 +35,13 @@
       "deepseek-flash",
       "deepseek-v4-pro"
     ],
-    "defaultMode": "cheap"
+    "defaultMode": "cheap",
+    "maxTools": {
+      "openai": 128,
+      "deepseek": 128,
+      "gemini": 128,
+      "anthropic": 512
+    }
   },
   "caching": {
     "enabled": true,

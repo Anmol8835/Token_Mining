@@ -44,11 +44,31 @@ const MODES = [
   },
 ];
 
+const CLASSIFIER_MODES = [
+  {
+    value: "auto",
+    label: "Hybrid",
+    body: "Rules, embedding and profile signals fused by weighted voting, with an LLM fallback on low confidence. Results cached.",
+  },
+  {
+    value: "llm",
+    label: "LLM only",
+    body: "Every request goes to the LLM classifier (deepseek-flash). Temporary test mode; no cache.",
+  },
+  {
+    value: "jev",
+    label: "Jev",
+    body: "TypeSafe's typed Choice questions in one API call. No cache; failures degrade to safe defaults.",
+  },
+];
+
 export default function RoutingPage() {
   const { data: cfg } = usePoll<DashboardConfig>("/api/server/config/dashboard", 5000);
   const { data: metrics } = usePoll<MetricsSnapshot>("/api/server/metrics", 5000);
   const [pending, setPending] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [classPending, setClassPending] = useState<string | null>(null);
+  const [classError, setClassError] = useState<string | null>(null);
 
   // Optimistic mode: highlight the pick instantly, clear it once the
   // next config poll reports the same value. Pruned during render
@@ -63,6 +83,16 @@ export default function RoutingPage() {
 
   const current = localMode ?? serverMode;
 
+  // Same optimistic pattern for the classifier picker.
+  const serverClassMode = cfg?.classifier?.mode ?? null;
+  const [localClassMode, setLocalClassMode] = useState<string | null>(null);
+  const [prevServerClassMode, setPrevServerClassMode] = useState(serverClassMode);
+  if (serverClassMode !== prevServerClassMode) {
+    setPrevServerClassMode(serverClassMode);
+    if (localClassMode && localClassMode === serverClassMode) setLocalClassMode(null);
+  }
+  const classCurrent = localClassMode ?? serverClassMode;
+
   async function select(mode: string) {
     setPending(mode);
     setLocalMode(mode);
@@ -74,6 +104,20 @@ export default function RoutingPage() {
       setError(err instanceof Error ? err.message : "failed to set mode");
     } finally {
       setPending(null);
+    }
+  }
+
+  async function selectClassifier(mode: string) {
+    setClassPending(mode);
+    setLocalClassMode(mode);
+    setClassError(null);
+    try {
+      await postJson("/api/server/config/classifier", { mode });
+    } catch (err) {
+      setLocalClassMode(null);
+      setClassError(err instanceof Error ? err.message : "failed to set classifier");
+    } finally {
+      setClassPending(null);
     }
   }
 
@@ -99,6 +143,46 @@ export default function RoutingPage() {
         <RoutingSkeleton />
       ) : (
         <>
+      <Panel title="Classifier" note="applies live, persists across restarts">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3" role="radiogroup" aria-label="Classifier mode">
+          {CLASSIFIER_MODES.map((mode) => {
+            const selected = classCurrent === mode.value;
+            const busy = classPending === mode.value;
+            return (
+              <button
+                key={mode.value}
+                type="button"
+                role="radio"
+                aria-checked={selected}
+                disabled={busy}
+                onClick={() => selectClassifier(mode.value)}
+                className={`hover-lift flex flex-col gap-2 rounded-xl border p-4 text-left transition-colors ${
+                  selected
+                    ? "border-accent bg-surface"
+                    : "border-hairline bg-surface hover:border-line"
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <span className="text-[15px] font-semibold text-ink">{mode.label}</span>
+                  {selected && <CheckCircle size={18} weight="fill" className="text-accent" aria-label="selected" />}
+                </div>
+                <span className="text-[13px] leading-relaxed text-ink-2">{mode.body}</span>
+              </button>
+            );
+          })}
+        </div>
+        {classError && (
+          <p className="mt-3 flex items-start gap-1.5 rounded-lg bg-critical/10 px-3 py-2 text-[13px] text-critical">
+            <WarningCircle size={15} weight="bold" className="mt-0.5 shrink-0" />
+            {classError}
+          </p>
+        )}
+        <p className="mt-3 text-xs text-ink-3">
+          Switching takes effect on the next request, no server restart needed. The value also
+          overrides classifier.mode in config/server.json on boot.
+        </p>
+      </Panel>
+
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4" role="radiogroup" aria-label="Routing mode">
         {MODES.map((mode) => {
           const selected = current === mode.value;

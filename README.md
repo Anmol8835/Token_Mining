@@ -91,6 +91,8 @@ The router swaps models per request, but the client replays history produced by 
 - `thinking`/`redacted_thinking` blocks are stripped (signatures are bound to the producing model).
 - Mid-conversation `role: "system"` messages are demoted to `user` on models that don't support them (only opus-4-8+/fable/mythos do).
 - Per-message `output_config` is stripped on models that don't support it.
+- When a request carries more tools than the serving provider accepts (`router.maxTools` in config/server.json — OpenAI/DeepSeek/Gemini 128, Anthropic 512), the proxy prunes to an active working set (essential built-ins + tools already discovered this conversation + a `ToolSearch` meta-tool), moves the rest to a `<available-deferred-tools>` catalog in the system text, and closes ToolSearch round-trips internally — the client only ever sees the final response.
+- OpenAI-sourced responses have LaTeX math delimiters rewritten to the KaTeX convention the client typesets (`\[ \]` → `$$ $$`, `\( \)` → `$ $`); text inside fenced code blocks is left untouched.
 
 Each transform logs a `✂️` line. Provider 400s log the real upstream error body.
 

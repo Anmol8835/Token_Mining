@@ -12,6 +12,13 @@ const { toPublicShape } = require("./lib/classifier/taxonomy");
 const { getLastUserMessage, extractSystemText } = require("./lib/classifier/text-utils");
 const metrics = require("./lib/metrics");
 const prefs = require("./lib/prefs");
+const {
+  META_TOOL_NAME,
+  buildPrunedBody,
+  resolveToolSearch,
+  buildToolResultBlock,
+} = require("./lib/tool-pruning");
+const toolsRegistry = require("./lib/tools-registry");
 const { runEvalSet } = require("./lib/eval");
 const { maybeCompact } = require("./lib/compaction");
 
@@ -119,6 +126,21 @@ app.use(express.static(path.join(__dirname, "public")));
 
 // Load configs and initialize
 const { modelsConfig, serverConfig, pricingConfig } = loadConfig();
+
+// A classifier mode chosen in the dashboard (data/dashboard-prefs.json)
+// overrides config/server.json at boot. Changes apply live: classify()
+// reads the mode on every request, so the dashboard picker swaps
+// classifiers without a restart.
+const prefClassifierMode = prefs.getClassifierMode();
+if (prefClassifierMode && serverConfig.classifier) {
+  if (serverConfig.classifier.mode !== prefClassifierMode) {
+    console.log(
+      `[classifier] mode ${serverConfig.classifier.mode} → ${prefClassifierMode} (dashboard prefs)`
+    );
+  }
+  serverConfig.classifier.mode = prefClassifierMode;
+}
+
 const registry = new ProviderRegistry(modelsConfig, serverConfig);
 
 // Metrics need pricing for the fixed-model baseline comparison.
@@ -320,6 +342,91 @@ async function extractErrorDetail(err) {
   return err?.message || "unknown error";
 }
 
+/**
+ * Response stub that swallows everything — used for internal
+ * non-streaming rounds of the ToolSearch loop so the provider's
+ * response doesn't get written to the client mid-exchange.
+ */
+const swallowRes = {
+  setHeader: () => {},
+  flushHeaders: () => {},
+  json: () => {},
+  status: () => swallowRes,
+};
+
+/**
+ * Re-stream a converted (non-streaming) response to the client as
+ * Anthropic SSE. Used when the ToolSearch loop buffered the exchange
+ * internally: the client asked for stream:true and still receives one
+ * clean stream of the final response.
+ */
+function emitConvertedAsSSE(res, converted, modelId) {
+  res.setHeader("Content-Type", "text/event-stream");
+  res.setHeader("Cache-Control", "no-cache");
+  res.setHeader("Connection", "keep-alive");
+  res.flushHeaders();
+  const send = (event, data) =>
+    res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+
+  const usage = converted.usage || {};
+  send("message_start", {
+    type: "message_start",
+    message: {
+      id: converted.id || `msg_${Date.now()}`,
+      type: "message",
+      role: "assistant",
+      model: modelId,
+      content: [],
+      stop_reason: null,
+      stop_sequence: null,
+      usage: {
+        input_tokens: usage.input_tokens || 0,
+        output_tokens: usage.output_tokens || 0,
+        cache_creation_input_tokens: 0,
+        cache_read_input_tokens: 0,
+      },
+    },
+  });
+
+  const blocks = converted.content || [];
+  for (let i = 0; i < blocks.length; i++) {
+    const block = blocks[i];
+    send("content_block_start", {
+      type: "content_block_start",
+      index: i,
+      content_block: block,
+    });
+    if (block.type === "text") {
+      send("content_block_delta", {
+        type: "content_block_delta",
+        index: i,
+        delta: { type: "text_delta", text: block.text || "" },
+      });
+    } else if (block.type === "tool_use") {
+      send("content_block_delta", {
+        type: "content_block_delta",
+        index: i,
+        delta: {
+          type: "input_json_delta",
+          partial_json: JSON.stringify(block.input || {}),
+        },
+      });
+    }
+    send("content_block_stop", { type: "content_block_stop", index: i });
+  }
+
+  send("message_delta", {
+    type: "message_delta",
+    delta: {
+      stop_reason: converted.stop_reason || "end_turn",
+      stop_sequence: null,
+    },
+    usage: { output_tokens: usage.output_tokens || 0 },
+  });
+  send("message_stop", { type: "message_stop" });
+  res.end();
+}
+
 // ============================================================
 // POST /v1/classify — pure classification endpoint
 //
@@ -487,17 +594,16 @@ app.post("/v1/messages", async (req, res) => {
       }
     }
 
-    // --- Step 3: Build native request ---
+    // --- Step 3+4: Build native request and call provider ---
+    // When the serving provider caps the tools list (router.maxTools),
+    // the proxy prunes inline tools, defers the rest to a system-text
+    // catalog, and closes ToolSearch round-trips internally — the
+    // client only ever sees the final response.
     const extraResponseFields = {
       classification: classificationPayloadForResponse,
       compaction: debug && compactionResult ? compactionResult : null,
     };
-    const nativePayload = provider.buildRequest({
-      ...req.body,
-      model: selectedModel.apiModelId,
-    });
 
-    // --- Step 4: Call provider with fallback ---
     const providerAttempts = [];
     const recordAttempt = (model, attemptStart, converted, ok) => {
       const latencyMs = Date.now() - attemptStart;
@@ -511,8 +617,101 @@ app.post("/v1/messages", async (req, res) => {
       return latencyMs;
     };
 
+    const maxToolsCaps = serverConfig.router?.maxTools || {};
+    const discoveredTools = toolsRegistry.get(req.body);
+
+    /**
+     * Serve one model, re-driving internally while the model calls the
+     * injected ToolSearch meta-tool. Attempts are recorded per round;
+     * provider errors rethrow for the fallback chain.
+     */
+    const serveModel = async (model, modelProvider, baseBody) => {
+      const pruned = buildPrunedBody(baseBody, maxToolsCaps, model.provider, discoveredTools);
+      let attemptBody = pruned ? pruned.prunedBody : baseBody;
+      let lastConverted = null;
+      const rounds = pruned ? 3 : 1;
+
+      for (let round = 0; round < rounds; round++) {
+        const attemptStart = Date.now();
+        // Internal rounds run non-streaming so the ToolSearch exchange
+        // never leaks to the client; the final response is re-delivered.
+        const attemptStream = pruned ? false : stream;
+        const nativePayload = modelProvider.buildRequest({
+          ...attemptBody,
+          model: model.apiModelId,
+          stream: attemptStream,
+        });
+
+        let converted;
+        try {
+          converted = await callProvider(
+            modelProvider, nativePayload, attemptStream,
+            pruned ? swallowRes : res, model.id, extraResponseFields
+          );
+        } catch (err) {
+          recordAttempt(model, attemptStart, null, false);
+          throw err;
+        }
+        recordAttempt(model, attemptStart, converted, true);
+        lastConverted = converted;
+
+        if (!pruned) return converted; // callProvider already responded
+
+        const searchCalls = (converted?.content || []).filter(
+          (b) => b.type === "tool_use" && b.name === META_TOOL_NAME
+        );
+        if (searchCalls.length === 0) {
+          // Final response — deliver in the client's requested shape.
+          if (stream) emitConvertedAsSSE(res, converted, model.id);
+          else res.json(converted);
+          return converted;
+        }
+
+        // Resolve every ToolSearch call, append the exchange, re-drive.
+        const resultBlocks = [];
+        for (const call of searchCalls) {
+          const toolDef = resolveToolSearch(baseBody, call);
+          if (toolDef) {
+            toolsRegistry.record(req.body, toolDef.name);
+            console.log(
+              `  🔎 ToolSearch: "${call.input?.query || ""}" → ${toolDef.name}`
+            );
+            resultBlocks.push(buildToolResultBlock(call, toolDef));
+          } else {
+            resultBlocks.push({
+              type: "tool_result",
+              tool_use_id: call.id,
+              content: [
+                {
+                  type: "text",
+                  text: "No matching tool found for query: " + (call.input?.query || ""),
+                },
+              ],
+            });
+          }
+        }
+        attemptBody = {
+          ...attemptBody,
+          messages: [
+            ...(attemptBody.messages || []),
+            { role: "assistant", content: converted.content },
+            { role: "user", content: resultBlocks },
+          ],
+        };
+        // Discovery may have grown the inline set — re-prune.
+        const rePruned = buildPrunedBody(attemptBody, maxToolsCaps, model.provider, discoveredTools);
+        attemptBody = rePruned ? rePruned.prunedBody : attemptBody;
+      }
+
+      // Rounds exhausted — deliver whatever the model last said.
+      if (lastConverted) {
+        if (stream) emitConvertedAsSSE(res, lastConverted, model.id);
+        else res.json(lastConverted);
+      }
+      return lastConverted;
+    };
+
     let fallbacksUsed = 0;
-    let callStart = Date.now();
     // gpt-6 models cannot serve function tools via /v1/chat/completions
     // (tools require /v1/responses there, and reasoning_effort has no
     // "none" value). Fail over to the fallback chain up front instead
@@ -527,10 +726,8 @@ app.post("/v1/messages", async (req, res) => {
           "gpt-6 cannot serve tools via chat/completions (needs /v1/responses); using fallback chain"
         );
       }
-      const converted = await callProvider(provider, nativePayload, stream, res, selectedModel.id, extraResponseFields);
-      recordAttempt(selectedModel, callStart, converted, true);
+      await serveModel(selectedModel, provider, req.body);
     } catch (providerErr) {
-      recordAttempt(selectedModel, callStart, null, false);
       // Primary provider failed — try fallback chain
       const fallbackChain = serverConfig.router?.providerFallbackChain || [];
       const apiErrMsg = await extractErrorDetail(providerErr);
@@ -552,19 +749,12 @@ app.post("/v1/messages", async (req, res) => {
         if (!fallbackModel || !fallbackProvider) continue;
 
         fallbacksUsed++;
-        callStart = Date.now();
         try {
-          const fallbackPayload = fallbackProvider.buildRequest({
-            ...req.body,
-            model: fallbackModel.apiModelId,
-          });
-
-          const fbConverted = await callProvider(fallbackProvider, fallbackPayload, stream, res, fallbackModel.id, extraResponseFields);
-          recordAttempt(fallbackModel, callStart, fbConverted, true);
+          await serveModel(fallbackModel, fallbackProvider, req.body);
           fallbackSuccess = true;
           break;
         } catch (fbErr) {
-          recordAttempt(fallbackModel, callStart, null, false);
+          // attempt already recorded inside serveModel
         }
       }
 
@@ -781,6 +971,10 @@ function dashboardCatalog() {
       disabledModels: prefs.getDisabledModels(),
     },
     routingModes: prefs.VALID_MODES,
+    classifier: {
+      mode: serverConfig.classifier?.mode || "auto",
+      modes: prefs.VALID_CLASSIFIER_MODES,
+    },
     policy,
     benchmark,
   };
@@ -822,6 +1016,22 @@ app.post("/config/routing", (req, res) => {
     });
   }
   res.json({ ok: true, routingMode: updated });
+});
+
+// Switch the active classifier (auto | llm | jev). Applies live —
+// classify() reads the mode per request — and persists across
+// restarts via dashboard prefs.
+app.post("/config/classifier", (req, res) => {
+  const { mode } = req.body || {};
+  const updated = prefs.setClassifierMode(mode);
+  if (updated === null) {
+    return res.status(400).json({
+      ok: false,
+      error: `mode must be one of: ${prefs.VALID_CLASSIFIER_MODES.join(", ")}`,
+    });
+  }
+  if (serverConfig.classifier) serverConfig.classifier.mode = updated;
+  res.json({ ok: true, classifierMode: updated });
 });
 
 // ============================================================
