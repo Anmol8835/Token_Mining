@@ -174,6 +174,7 @@ export type DashboardConfig = {
   models: ModelCatalogEntry[];
   prefs: { routingMode: string | null; disabledModels: string[] };
   routingModes: string[];
+  classifier: { mode: string; modes: string[] };
   policy: { version?: number; generatedAt?: string; rules: unknown[] } | null;
   benchmark: BenchmarkReport | null;
 };
