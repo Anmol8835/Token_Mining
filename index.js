@@ -4,6 +4,7 @@ const express = require("express");
 const axios = require("axios");
 const path = require("path");
 const fs = require("fs");
+const crypto = require("crypto");
 
 const ProviderRegistry = require("./lib/providers");
 const HybridClassifier = require("./lib/classifier");
@@ -12,6 +13,7 @@ const { toPublicShape } = require("./lib/classifier/taxonomy");
 const { getLastUserMessage, extractSystemText } = require("./lib/classifier/text-utils");
 const metrics = require("./lib/metrics");
 const prefs = require("./lib/prefs");
+const apiKeys = require("./lib/api-keys");
 const {
   META_TOOL_NAME,
   buildPrunedBody,
@@ -57,6 +59,73 @@ function attachClassification(res, classification, debug) {
     console.warn(`[classify] Could not set X-Classification header: ${err.message}`);
   }
   return payload;
+}
+
+// ------------------------------------------------------------
+// API key auth — gates /v1/messages and /v1/classify
+// ------------------------------------------------------------
+
+/**
+ * Pull a client key out of the request: `Authorization: Bearer <key>`
+ * first (OpenAI/Anthropic convention), then `x-api-key`. Scheme is
+ * case-insensitive per RFC 7235.
+ */
+function extractRawKey(req) {
+  const auth = req.headers.authorization;
+  const bearer = typeof auth === "string" ? auth.match(/^Bearer\s+(.+)$/i) : null;
+  if (bearer) return bearer[1].trim();
+  const xKey = req.headers["x-api-key"];
+  return typeof xKey === "string" && xKey ? xKey : null;
+}
+
+/**
+ * Express middleware for the two /v1/* routes. While zero keys exist
+ * the server stays open (bootstrap — the first key is created from
+ * the dashboard); once one exists, every request must carry a valid
+ * key or gets Anthropic's exact 401 authentication_error envelope.
+ *
+ * Runs after the global express.json body parser, so unauthenticated
+ * payloads never reach the system.txt debug dump below.
+ */
+function requireApiKey(req, res, next) {
+  if (apiKeys.count() === 0) {
+    console.warn(
+      "[api-keys] no keys configured — allowing unauthenticated request " +
+      "(bootstrap; create a key in the dashboard)"
+    );
+    return next();
+  }
+  const raw = extractRawKey(req);
+  const entry = raw ? apiKeys.verify(raw, req.path) : null;
+  if (!entry) {
+    return res.status(401).json({
+      type: "error",
+      error: { type: "authentication_error", message: "invalid x-api-key" },
+    });
+  }
+  next();
+}
+
+/**
+ * Admin token auth — gates /config/* and /metrics* on cloud
+ * deployments. ADMIN_TOKEN unset => the gate is a no-op (local dev
+ * unchanged). Set => every admin request needs an x-admin-token
+ * header. /health and /v1/* are deliberately NOT gated (health checks
+ * + API keys respectively).
+ */
+function adminGate(req, res, next) {
+  const token = process.env.ADMIN_TOKEN;
+  if (!token) return next(); // local dev: open
+  const given = req.headers["x-admin-token"];
+  if (typeof given !== "string") {
+    return res.status(401).json({ ok: false, error: "invalid admin token" });
+  }
+  const a = Buffer.from(given);
+  const b = Buffer.from(token);
+  if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) {
+    return res.status(401).json({ ok: false, error: "invalid admin token" });
+  }
+  next();
 }
 
 // ============================================================
@@ -152,6 +221,12 @@ if (registry.getAllModels().length === 0) {
 }
 
 const classifier = new HybridClassifier(serverConfig, registry);
+
+const apiKeyCount = apiKeys.count();
+console.log(
+  `[api-keys] ${apiKeyCount} key(s) loaded — /v1/messages + /v1/classify enforcement ` +
+  (apiKeyCount > 0 ? "ON" : "OFF (no keys yet)")
+);
 
 
 // ------------------------------------------------------------
@@ -433,7 +508,7 @@ function emitConvertedAsSSE(res, converted, modelId) {
 // Returns ONLY the classification JSON. Never answers the prompt.
 // ============================================================
 
-app.post("/v1/classify", async (req, res) => {
+app.post("/v1/classify", requireApiKey, async (req, res) => {
   const startTime = Date.now();
   try {
     const debug = req.query.debug === "1" || req.headers["x-debug"] === "1";
@@ -479,7 +554,7 @@ app.post("/v1/classify", async (req, res) => {
 // POST /v1/messages
 // ============================================================
 
-app.post("/v1/messages", async (req, res) => {
+app.post("/v1/messages", requireApiKey, async (req, res) => {
   const startTime = Date.now();
   const promptText = getLastUserMessage(req.body.messages).replace(/\s+/g, " ").trim();
   console.log(`▶ prompt: ${promptText.slice(0, 160) || "(empty)"}`);
@@ -497,12 +572,17 @@ app.post("/v1/messages", async (req, res) => {
     // router's whole input, byte for byte. system.txt is gitignored —
     // raw payloads must never enter the repo (see the 2026-09-21
     // secret-scan incident).
-    fs.appendFileSync(
-      path.join(__dirname, "system.txt"),
-      `\n=== IN ${new Date().toISOString()} model=${modelName} ${stream ? "stream" : "non-stream"}` +
-        ` mode=${(req.headers["x-routing-mode"] || "default").toLowerCase()} ===\n` +
-        JSON.stringify(req.body, null, 2) + "\n"
-    );
+    // Off by default (was unconditional until 2026-10-02 — grew past
+    // 1GB of raw payloads on disk); enable per-process with
+    // DEBUG_DUMP=1 for routing debugging only.
+    if (process.env.DEBUG_DUMP === "1") {
+      fs.appendFileSync(
+        path.join(__dirname, "system.txt"),
+        `\n=== IN ${new Date().toISOString()} model=${modelName} ${stream ? "stream" : "non-stream"}` +
+          ` mode=${(req.headers["x-routing-mode"] || "default").toLowerCase()} ===\n` +
+          JSON.stringify(req.body, null, 2) + "\n"
+      );
+    }
 
     let selectedModel;
     let classification = null;
@@ -831,6 +911,12 @@ app.get("/health", (req, res) => {
   });
 });
 
+// Admin-only zone (see adminGate above). Mounted before the route
+// declarations so every /config/* and /metrics* route below is
+// gated when ADMIN_TOKEN is set. /health and /v1/* are declared
+// above and stay ungated; the static middleware is unaffected.
+app.use(["/config", "/metrics"], adminGate);
+
 // ============================================================
 // Metrics endpoints — consumed by the dashboard in public/
 // ============================================================
@@ -1034,19 +1120,65 @@ app.post("/config/classifier", (req, res) => {
   res.json({ ok: true, classifierMode: updated });
 });
 
+// ------------------------------------------------------------
+// API key management — consumed by the dashboard's API Keys page.
+// NOTE: once the first key exists, /v1/messages and /v1/classify
+// require a valid key (see requireApiKey above); these endpoints
+// stay ungated so keys can always be managed.
+// ------------------------------------------------------------
+
+app.get("/config/api-keys", (req, res) => {
+  res.json({ keys: apiKeys.listKeys() });
+});
+
+app.post("/config/api-keys", (req, res) => {
+  const created = apiKeys.createKey(req.body?.name);
+  if (!created) {
+    return res.status(400).json({
+      ok: false,
+      error: "name must be a non-empty string (max 60 chars)",
+    });
+  }
+  // apiKey is the plaintext — returned exactly once, never stored.
+  res.json({ ok: true, key: created.entry, apiKey: created.secret });
+});
+
+app.delete("/config/api-keys/:id", (req, res) => {
+  if (!apiKeys.revokeKey(req.params.id)) {
+    return res.status(404).json({
+      ok: false,
+      error: `Unknown key id "${req.params.id}"`,
+    });
+  }
+  res.json({ ok: true, keys: apiKeys.listKeys() });
+});
+
 // ============================================================
 // Start
 // ============================================================
 
 app.listen(PORT, () => {
   console.log(`\n🚀 LLM Proxy Server running on http://localhost:${PORT}`);
-  console.log(`   POST /v1/messages    — Anthropic-format API`);
-  console.log(`   POST /v1/classify    — Prompt classification (JSON only)`);
+  console.log(`   POST /v1/messages    — Anthropic-format API (API key required)`);
+  console.log(`   POST /v1/classify    — Prompt classification (API key required)`);
   console.log(`   GET  /               — Routing metrics dashboard`);
   console.log(`   GET  /metrics        — Metrics JSON`);
   console.log(`   GET  /config/dashboard — Model catalog + routing prefs`);
   console.log(`   POST /config/models  — Enable/disable a model`);
   console.log(`   POST /config/routing — Set default routing mode`);
+  console.log(`   GET  /config/api-keys  — List API keys`);
+  console.log(`   POST /config/api-keys  — Create an API key`);
+  console.log(`   DELETE /config/api-keys/:id — Revoke an API key`);
   console.log(`   POST /metrics/eval   — Run classifier eval set`);
-  console.log(`   GET  /health         — Server status\n`);
+  console.log(`   GET  /health         — Server status`);
+  console.log(
+    `   debug dump  : ${process.env.DEBUG_DUMP === "1" ? "ON (system.txt)" : "off"}`
+  );
+  console.log(
+    `   admin gate  : ${
+      process.env.ADMIN_TOKEN
+        ? "active (x-admin-token for /config/*, /metrics*)"
+        : "off (no ADMIN_TOKEN set)"
+    }\n`
+  );
 });

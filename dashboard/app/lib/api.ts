@@ -179,6 +179,17 @@ export type DashboardConfig = {
   benchmark: BenchmarkReport | null;
 };
 
+export type ApiKeyEntry = {
+  id: string;
+  name: string;
+  prefix: string;
+  createdAt: string;
+  lastUsedAt: string | null;
+  lastUsedRoute: string | null;
+};
+
+export type ApiKeyList = { keys: ApiKeyEntry[] };
+
 export async function fetchJson<T>(path: string): Promise<T> {
   const res = await fetch(path, { cache: "no-store" });
   if (!res.ok) throw new Error(`backend responded ${res.status}`);
@@ -198,7 +209,21 @@ export async function postJson<T>(path: string, body: unknown): Promise<T> {
   return json as T;
 }
 
+export async function deleteJson<T>(path: string): Promise<T> {
+  const res = await fetch(path, { method: "DELETE" });
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error((json as { error?: string }).error || `backend responded ${res.status}`);
+  }
+  return json as T;
+}
+
 export const getMetrics = () => fetchJson<MetricsSnapshot>("/api/server/metrics");
 export const getConfig = () => fetchJson<DashboardConfig>("/api/server/config/dashboard");
 export const getHealth = () =>
   fetchJson<{ status: string; models: { id: string }[] }>("/api/server/health");
+export const getApiKeys = () => fetchJson<ApiKeyList>("/api/server/config/api-keys");
+export const createApiKey = (name: string) =>
+  postJson<{ ok: true; key: ApiKeyEntry; apiKey: string }>("/api/server/config/api-keys", {
+    name,
+  });

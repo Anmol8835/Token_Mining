@@ -1,0 +1,35 @@
+# One stack = one command: `docker compose up -d --build`.
+# Caddy terminates HTTPS (auto Let's Encrypt via the DOMAIN env);
+# llm-proxy listens on localhost only — Caddy is the public door.
+
+services:
+  llm-proxy:
+    build: .
+    container_name: llm-proxy
+    restart: unless-stopped
+    env_file: .env
+    ports:
+      - "127.0.0.1:8002:8002"   # localhost-only; public traffic comes via Caddy
+    volumes:
+      - ./data:/app/data        # api-keys.json, dashboard-prefs.json, usage-stats.json
+
+  caddy:
+    image: caddy:2-alpine
+    container_name: caddy
+    restart: unless-stopped
+    depends_on:
+      - llm-proxy
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"           # HTTP/3
+    environment:
+      DOMAIN: ${DOMAIN}         # interpolated from ./.env
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+
+volumes:
+  caddy_data:
+  caddy_config:

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ArrowsSplit, Cube, Gauge, ListDashes, Shuffle } from "@phosphor-icons/react";
+import { ArrowsSplit, Cube, Gauge, Key, ListDashes, Shuffle } from "@phosphor-icons/react";
 import { usePoll } from "@/app/lib/use-poll";
 import { ThemeToggle } from "@/app/components/theme-toggle";
 
@@ -11,6 +11,7 @@ const LINKS = [
   { href: "/models", label: "Models", icon: Cube },
   { href: "/routing", label: "Routing", icon: Shuffle },
   { href: "/activity", label: "Activity", icon: ListDashes },
+  { href: "/api-keys", label: "API Keys", icon: Key },
 ];
 
 function isActive(pathname: string, href: string) {

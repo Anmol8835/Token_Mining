@@ -1,0 +1,4 @@
+{$DOMAIN} {
+	reverse_proxy llm-proxy:8002
+	encode gzip
+}
