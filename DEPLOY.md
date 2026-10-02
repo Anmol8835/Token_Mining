@@ -11,8 +11,22 @@ subdomain) whose DNS you control.
 
 ## 1. Provision the VPS
 
-Any provider works (Hetzner/DigitalOcean/etc.). **Ubuntu 22.04 or 24.04, 2GB
-RAM minimum.** SSH in as root (or a sudo user):
+Any provider works (Hetzner/DigitalOcean/etc.). **Ubuntu 22.04/24.04 or
+Debian 12/13.** Hardware: 2 vCPUs and 1 GB RAM is enough *with swap* (the
+stack idles at ~400–550 MB: Docker daemon + Node app + Caddy). Expect
+~1 GB of disk for images and build cache. If you have no swap yet, add a
+2 GB swapfile first — request-body spikes (the API accepts up to 50 MB
+JSON) can OOM the box without it:
+
+```sh
+sudo fallocate -l 2G /swapfile
+sudo chmod 600 /swapfile
+sudo mkswap /swapfile
+sudo swapon /swapfile
+echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab
+```
+
+Then SSH in as root (or a sudo user):
 
 ```sh
 apt update && apt upgrade -y
@@ -141,6 +155,9 @@ export ANTHROPIC_AUTH_TOKEN=sk-relay-...
 ```sh
 docker compose logs -f           # tail both services
 docker compose restart llm-proxy # restart the app
+free -h                          # watch RAM/swap on small VMs
+docker stats                     # per-container RAM
+docker builder prune -f          # reclaim build-cache disk after updates
 ```
 
 - **Config changes** (`config/*.json`): re-rsync, then `docker compose up -d
