@@ -8,10 +8,20 @@
 {$DOMAIN} {
 	encode gzip
 
-	handle /v1/*     { reverse_proxy llm-proxy:8002 }
-	handle /health   { reverse_proxy llm-proxy:8002 }
-	handle /metrics* { reverse_proxy llm-proxy:8002 }
-	handle /config*  { reverse_proxy llm-proxy:8002 }
+	handle /v1/* {
+		reverse_proxy llm-proxy:8002
+	}
+	handle /health {
+		reverse_proxy llm-proxy:8002
+	}
+	handle /metrics* {
+		reverse_proxy llm-proxy:8002
+	}
+	handle /config* {
+		reverse_proxy llm-proxy:8002
+	}
 
-	handle { reverse_proxy dashboard:3000 }
+	handle {
+		reverse_proxy dashboard:3000
+	}
 }
