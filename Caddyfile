@@ -1,4 +1,17 @@
+# Single hostname, path routing: backend API paths go to the Express
+# proxy; everything else (the console UI + its /api/server/* helper
+# routes) goes to the Next.js dashboard.
+#
+# NOTE: migrate to a real domain by changing DOMAIN in .env; to split
+# into two hostnames later (api.* + dash.*), give each its own site
+# block here.
 {$DOMAIN} {
-	reverse_proxy llm-proxy:8002
 	encode gzip
+
+	handle /v1/*     { reverse_proxy llm-proxy:8002 }
+	handle /health   { reverse_proxy llm-proxy:8002 }
+	handle /metrics* { reverse_proxy llm-proxy:8002 }
+	handle /config*  { reverse_proxy llm-proxy:8002 }
+
+	handle { reverse_proxy dashboard:3000 }
 }

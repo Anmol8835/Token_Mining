@@ -1,11 +1,12 @@
 # Deploying the proxy to a VPS
 
-Runbook for hosting the LLM proxy on your own Ubuntu VPS with Docker + Caddy
-(HTTPS via Let's Encrypt). When done, clients use your domain as the base URL
-and an API key created in step 6.
+Runbook for hosting the LLM proxy + dashboard on your own Ubuntu VPS with
+Docker + Caddy (HTTPS via Let's Encrypt). When done: clients use your domain
+as the API base URL + an API key; you use the same domain in a browser for
+the console.
 
-Prerequisites: a VPS with a public IPv4, an SSH login, and a domain (or
-subdomain) whose DNS you control.
+Prerequisites: a VPS with a public IPv4 and an SSH login. A domain is
+recommended but not required — see the nip.io note in step 2.
 
 ---
 
@@ -54,6 +55,12 @@ dig +short api.example.com
 
 Caddy needs the record live before it can issue the certificate.
 
+**No domain yet?** Use [nip.io](https://nip.io): the hostname
+`<your-vps-ip>.nip.io` (e.g. `34.100.171.213.nip.io`) resolves to your VPS
+automatically, and Caddy can still get a real Let's Encrypt certificate for
+it. Set `DOMAIN=34.100.171.213.nip.io` in step 4. Switch to your real domain
+later by editing `DOMAIN` and re-running `docker compose up -d`.
+
 ## 3. Ship the code
 
 From your laptop, in this repo (commit your work first so you ship a known
@@ -61,8 +68,8 @@ state):
 
 ```sh
 rsync -av --delete \
-  --exclude node_modules --exclude .env --exclude data \
-  --exclude system.txt --exclude dashboard --exclude benchmark \
+  --exclude node_modules --exclude '.next' --exclude '.env*' --exclude data \
+  --exclude system.txt --exclude benchmark \
   --exclude .git --exclude .agents --exclude .claude \
   --exclude '*.md' --exclude skills-lock.json --exclude diagnose-routing.js \
   . user@VPS_IP:/opt/llm-proxy/
@@ -100,8 +107,32 @@ grew past 1GB locally).
 ```sh
 cd /opt/llm-proxy
 docker compose up -d --build
-docker compose ps          # llm-proxy should report (healthy)
+docker compose ps          # llm-proxy + dashboard should report (healthy)
 ```
+
+The first build compiles the Next.js dashboard on the VM — expect several
+minutes on 1 GB RAM (it leans on your swapfile). If it gets OOM-killed,
+build the image on your laptop instead and ship it:
+
+```sh
+# laptop
+docker build -t dashboard:prod --build-arg BACKEND_URL=http://llm-proxy:8002 dashboard/
+docker save dashboard:prod | ssh user@VPS_IP 'docker load'
+# then pin `image: dashboard:prod` (replacing `build: ./dashboard`) in
+# docker-compose.yml and `docker compose up -d`
+```
+
+## 5b. The dashboard
+
+Once Caddy has the certificate, open `https://<DOMAIN>/` in a browser — that's
+the console (metrics, models, routing, activity, API Keys). Everything else
+lives at the same hostname: the API paths (`/v1/*`, `/health`, `/metrics*`,
+`/config*`) route to the backend, the rest serves the dashboard.
+
+**The dashboard is currently public** — anyone with the URL can view metrics
+(creating keys still goes through the admin token, which is injected
+server-side and never reaches the browser). Add auth before sharing the URL
+widely; the single chokepoint is `dashboard/proxy.ts`.
 
 ## 6. Create the first API key — do this immediately
 
@@ -122,6 +153,9 @@ exactly once**.
 ## 7. Verify
 
 ```sh
+# dashboard responds (200 = console up)
+curl -s -o /dev/null -w '%{http_code}\n' https://api.example.com/
+
 # health is public
 curl -s https://api.example.com/health
 
@@ -153,8 +187,9 @@ export ANTHROPIC_AUTH_TOKEN=sk-relay-...
 ## 9. Day-to-day ops
 
 ```sh
-docker compose logs -f           # tail both services
+docker compose logs -f           # tail all services
 docker compose restart llm-proxy # restart the app
+docker compose restart dashboard # restart the console
 free -h                          # watch RAM/swap on small VMs
 docker stats                     # per-container RAM
 docker builder prune -f          # reclaim build-cache disk after updates
@@ -164,6 +199,9 @@ docker builder prune -f          # reclaim build-cache disk after updates
   --build` — config is baked into the image.
 - **Code updates**: commit locally, re-rsync (step 3), `docker compose up -d
   --build`.
+- **Caddyfile changes**: re-rsync, then `docker compose restart caddy` —
+  bind-mounted file contents aren't tracked by compose, so `up -d` alone
+  won't pick them up.
 - **Backups**: `sudo tar czf backup-$(date +%F).tar.gz data/` — the three
   JSONs in `data/` (api-keys.json, dashboard-prefs.json, usage-stats.json)
   are the only state. (`sudo` because the container runs as root and owns

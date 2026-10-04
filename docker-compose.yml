@@ -13,12 +13,21 @@ services:
     volumes:
       - ./data:/app/data        # api-keys.json, dashboard-prefs.json, usage-stats.json
 
+  dashboard:
+    build: ./dashboard
+    container_name: dashboard
+    restart: unless-stopped
+    env_file: .env              # runtime ADMIN_TOKEN for the proxy token injection
+    depends_on:
+      - llm-proxy
+
   caddy:
     image: caddy:2-alpine
     container_name: caddy
     restart: unless-stopped
     depends_on:
       - llm-proxy
+      - dashboard
     ports:
       - "80:80"
       - "443:443"
