@@ -15,6 +15,7 @@ services:
 
   dashboard:
     build: ./dashboard
+    image: dashboard:prod        # pin the tag so a laptop-built image can be loaded and used
     container_name: dashboard
     restart: unless-stopped
     env_file: .env              # runtime ADMIN_TOKEN for the proxy token injection

@@ -110,17 +110,20 @@ docker compose up -d --build
 docker compose ps          # llm-proxy + dashboard should report (healthy)
 ```
 
-The first build compiles the Next.js dashboard on the VM — expect several
-minutes on 1 GB RAM (it leans on your swapfile). If it gets OOM-killed,
-build the image on your laptop instead and ship it:
+On a small VM (≤2 GB RAM), build the dashboard image **on your laptop** and
+ship it — the compose file pins `image: dashboard:prod`, so a loaded image is
+used as-is:
 
 ```sh
 # laptop
 docker build -t dashboard:prod --build-arg BACKEND_URL=http://llm-proxy:8002 dashboard/
-docker save dashboard:prod | ssh user@VPS_IP 'docker load'
-# then pin `image: dashboard:prod` (replacing `build: ./dashboard`) in
-# docker-compose.yml and `docker compose up -d`
+docker save dashboard:prod | gzip | ssh user@VPS_IP 'gunzip | docker load'
+# then on the VM
+docker compose up -d --no-build && docker compose restart caddy
 ```
+
+(Alternatively let the VM compile it with a plain `docker compose up -d
+--build` — expect several minutes on 1 GB RAM.)
 
 ## 5b. The dashboard
 
