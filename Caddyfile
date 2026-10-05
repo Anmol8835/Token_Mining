@@ -20,6 +20,11 @@
 	handle /config* {
 		reverse_proxy llm-proxy:8002
 	}
+	# Dodo Payments webhooks — public; authenticated by the Dodo
+	# signature (DODO_PAYMENTS_WEBHOOK_KEY), never by ADMIN_TOKEN.
+	handle /webhooks* {
+		reverse_proxy llm-proxy:8002
+	}
 
 	handle {
 		reverse_proxy dashboard:3000

@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { Check, WarningCircle, X } from "@phosphor-icons/react";
 import type { ApiKeyEntry, ApiKeyList } from "@/app/lib/api";
-import { createApiKey, deleteJson } from "@/app/lib/api";
+import { createApiKey, deleteJson, getMe } from "@/app/lib/api";
 import { usePoll } from "@/app/lib/use-poll";
 import { fmtDateTime } from "@/app/lib/format";
 import { Badge, Button, EmptyState, Panel, Skeleton } from "@/app/components/ui";
@@ -21,6 +21,7 @@ export default function ApiKeysPage() {
   const { data } = usePoll<ApiKeyList>("/api/server/config/api-keys", LIST_POLL_MS);
 
   const [name, setName] = useState("");
+  const [userId, setUserId] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
 
@@ -39,13 +40,23 @@ export default function ApiKeysPage() {
     return () => clearTimeout(t);
   }, [confirmRevokeId]);
 
+  async function resolveUserId(): Promise<string> {
+    if (userId) return userId;
+    const me = await getMe();
+    setUserId(me.user.id);
+    return me.user.id;
+  }
+
   async function handleCreate() {
     const trimmed = name.trim();
     if (!trimmed || creating) return;
     setCreating(true);
     setCreateError(null);
     try {
-      const res = await createApiKey(trimmed);
+      // Link the key to the signed-in account — an unlinked key is
+      // rejected (402 key_not_linked) once plan enforcement is on.
+      const uid = await resolveUserId();
+      const res = await createApiKey(trimmed, uid);
       setNewSecret({ apiKey: res.apiKey, name: res.key.name });
       setName("");
     } catch (err) {

@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
 import { GeistSans } from "geist/font/sans";
 import { GeistMono } from "geist/font/mono";
+import { cookies } from "next/headers";
 import { Nav } from "@/app/components/nav";
+import { getSessionUser, SESSION_COOKIE } from "@/lib/auth";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -25,7 +27,15 @@ const themeScript = `
 })();
 `;
 
-export default function RootLayout({ children }: LayoutProps<"/">) {
+/**
+ * Console shell for signed-in users only. Without a session, proxy.ts
+ * redirects every page to /login, so the bare (nav-less) branch here
+ * renders that one page centered.
+ */
+export default async function RootLayout({ children }: LayoutProps<"/">) {
+  const token = (await cookies()).get(SESSION_COOKIE)?.value;
+  const user = getSessionUser(token);
+
   return (
     <html
       lang="en"
@@ -36,16 +46,24 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
       </head>
       <body className="flex min-h-full flex-col bg-page text-ink">
-        <Nav />
-        <main className="mx-auto w-full max-w-7xl flex-1 px-4 py-6 sm:px-6 sm:py-8 md:pl-[calc(15rem+1.5rem)]">
-          {children}
-        </main>
-        <footer className="border-t border-line md:pl-60">
-          <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-4 text-xs text-ink-3 sm:px-6">
-            <span>Relay console for the LLM router.</span>
-            <span className="tnum">Port 8002 proxy</span>
-          </div>
-        </footer>
+        {user ? (
+          <>
+            <Nav user={user} />
+            <main className="mx-auto w-full max-w-7xl flex-1 px-4 py-6 sm:px-6 sm:py-8 md:pl-[calc(15rem+1.5rem)]">
+              {children}
+            </main>
+            <footer className="border-t border-line md:pl-60">
+              <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-4 text-xs text-ink-3 sm:px-6">
+                <span>Relay console for the LLM router.</span>
+                <span className="tnum">Port 8002 proxy</span>
+              </div>
+            </footer>
+          </>
+        ) : (
+          <main className="mx-auto flex w-full max-w-7xl flex-1 items-center justify-center px-4 py-10">
+            {children}
+          </main>
+        )}
       </body>
     </html>
   );

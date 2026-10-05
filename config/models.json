@@ -2,6 +2,7 @@
   "models": [
     {
       "id": "deepseek-v4-pro",
+      "tier": "pro",
       "provider": "deepseek",
       "apiModelId": "deepseek-v4-pro",
       "capabilities": {
@@ -48,6 +49,7 @@
     },
     {
       "id": "deepseek-flash",
+      "tier": "cheap",
       "provider": "deepseek",
       "apiModelId": "deepseek-flash",
       "capabilities": {
@@ -89,6 +91,7 @@
     },
     {
       "id": "claude-haiku-4-5",
+      "tier": "cheap",
       "provider": "anthropic",
       "apiModelId": "claude-haiku-4-5-20251001",
       "capabilities": {
@@ -129,6 +132,7 @@
     },
     {
       "id": "claude-sonnet-5",
+      "tier": "pro",
       "provider": "anthropic",
       "apiModelId": "claude-sonnet-5",
       "capabilities": {
@@ -173,6 +177,7 @@
     },
     {
       "id": "claude-opus-4-8",
+      "tier": "pro",
       "provider": "anthropic",
       "apiModelId": "claude-opus-4-8",
       "capabilities": {
@@ -219,6 +224,7 @@
     },
     {
       "id": "gpt-6-astra",
+      "tier": "pro",
       "provider": "openai",
       "apiModelId": "gpt-6-astra",
       "notes": "toolUse=false for this proxy: /v1/chat/completions rejects function tools on this model (tools need /v1/responses)",
@@ -266,6 +272,7 @@
     },
     {
       "id": "gpt-5.6-sol",
+      "tier": "pro",
       "provider": "openai",
       "apiModelId": "gpt-5.6-sol",
       "capabilities": {
@@ -312,6 +319,7 @@
     },
     {
       "id": "gpt-5.6-terra",
+      "tier": "pro",
       "provider": "openai",
       "apiModelId": "gpt-5.6-terra",
       "capabilities": {
@@ -356,6 +364,7 @@
     },
     {
       "id": "gpt-5.6-luna",
+      "tier": "cheap",
       "provider": "openai",
       "apiModelId": "gpt-5.6-luna",
       "capabilities": {
@@ -398,6 +407,7 @@
     },
     {
       "id": "gemini-2.5-flash",
+      "tier": "cheap",
       "provider": "gemini",
       "apiModelId": "gemini-2.5-flash",
       "capabilities": {
@@ -437,6 +447,7 @@
     },
     {
       "id": "gemini-2.5-pro",
+      "tier": "pro",
       "provider": "gemini",
       "apiModelId": "gemini-2.5-pro",
       "capabilities": {

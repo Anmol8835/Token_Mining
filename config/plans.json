@@ -1,0 +1,17 @@
+{
+  "updated": "2026-10-05",
+  "notes": "Paid plans (Dodo Payments subscriptions). Product ids differ per Dodo environment (test_mode vs live_mode) — paste the ids from the Dodo dashboard. monthlyQuotaUsd is the calendar-month (UTC) spend cap on cost_usd + classifier_cost_usd; 0 = unlimited. tiers gate which model tiers (config/models.json `tier`) a plan may call. Mirror: dashboard/lib/plans.json — keep in sync.",
+  "plans": [
+    {
+      "id": "monthly",
+      "name": "Monthly",
+      "priceUsd": 9,
+      "monthlyQuotaUsd": 10,
+      "tiers": ["cheap", "pro"],
+      "products": {
+        "test_mode": "pdt_test_REPLACE_ME",
+        "live_mode": "pdt_live_REPLACE_ME"
+      }
+    }
+  ]
+}

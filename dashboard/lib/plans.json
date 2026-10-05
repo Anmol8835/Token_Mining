@@ -1,0 +1,17 @@
+{
+  "updated": "2026-10-05",
+  "notes": "MIRROR of the repo-root config/plans.json (the dashboard build context is dashboard/, so it can't reach ../config — same convention as lib/schema.sql). Keep in sync; the copy is shipped by the Dockerfile.",
+  "plans": [
+    {
+      "id": "monthly",
+      "name": "Monthly",
+      "priceUsd": 9,
+      "monthlyQuotaUsd": 10,
+      "tiers": ["cheap", "pro"],
+      "products": {
+        "test_mode": "pdt_test_REPLACE_ME",
+        "live_mode": "pdt_live_REPLACE_ME"
+      }
+    }
+  ]
+}

@@ -19,6 +19,10 @@ services:
     container_name: dashboard
     restart: unless-stopped
     env_file: .env              # runtime ADMIN_TOKEN for the proxy token injection
+    environment:
+      DB_PATH: /app/data/app.db  # shared SQLite: users/sessions/usage (see lib/db.ts)
+    volumes:
+      - ./data:/app/data        # app.db lives next to api-keys/usage-stats JSON
     depends_on:
       - llm-proxy
 

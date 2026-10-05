@@ -1,3 +1,5 @@
+# The Dockerfile installs deps itself (pnpm install --frozen-lockfile);
+# copying the host's pnpm tree would overwrite the container's fresh
+# install with host-store symlinks and blow up the build context.
 node_modules
 .next
-.env*

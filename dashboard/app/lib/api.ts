@@ -190,6 +190,30 @@ export type ApiKeyEntry = {
 
 export type ApiKeyList = { keys: ApiKeyEntry[] };
 
+/**
+ * Per-account durable totals from the dashboard's own /api/totals
+ * route (reads usage_daily in the shared SQLite file — written by
+ * the proxy's 30s persist tick).
+ */
+export type TotalsSnapshot = {
+  ok: true;
+  user: { id: string; email: string; name: string | null };
+  totals: {
+    requests: number;
+    inputTokens: number;
+    outputTokens: number;
+    cacheReadTokens: number;
+    cacheWriteTokens: number;
+    costUsd: number;
+    classifierCostUsd: number;
+    baselineCostUsd: number;
+    actualCostUsd: number;
+    savedUsd: number;
+    savedPct: number | null;
+  };
+  daily: { day: string; requests: number; costUsd: number; savedUsd: number }[];
+};
+
 export async function fetchJson<T>(path: string): Promise<T> {
   const res = await fetch(path, { cache: "no-store" });
   if (!res.ok) throw new Error(`backend responded ${res.status}`);
@@ -218,12 +242,44 @@ export async function deleteJson<T>(path: string): Promise<T> {
   return json as T;
 }
 
+export type AuthUser = { id: string; email: string; name: string | null };
+
+/** Shape of /api/billing/state (dashboard-local route). */
+export type BillingState = {
+  ok: true;
+  status: "active" | "pending" | "suspended";
+  planId: string;
+  planExpiry: number | null;
+  effective: boolean;
+  plan: {
+    id: string;
+    name: string;
+    priceUsd: number;
+    monthlyQuotaUsd: number;
+    tiers: string[];
+  } | null;
+  subscription: { id: string; status: string; currentPeriodEnd: number | null } | null;
+  usage: { monthStart: string; usedUsd: number; quotaUsd: number; unlimited: boolean };
+  checkoutConfigured: boolean;
+};
+
 export const getMetrics = () => fetchJson<MetricsSnapshot>("/api/server/metrics");
 export const getConfig = () => fetchJson<DashboardConfig>("/api/server/config/dashboard");
 export const getHealth = () =>
   fetchJson<{ status: string; models: { id: string }[] }>("/api/server/health");
 export const getApiKeys = () => fetchJson<ApiKeyList>("/api/server/config/api-keys");
-export const createApiKey = (name: string) =>
+export const getTotals = () => fetchJson<TotalsSnapshot>("/api/totals");
+export const getBillingState = () => fetchJson<BillingState>("/api/billing/state");
+export const postCheckout = (planId?: string) =>
+  postJson<{ ok: true; checkoutUrl: string; sessionId: string }>("/api/billing/checkout", {
+    planId,
+  });
+export const getPortalUrl = () => fetchJson<{ ok: true; url: string }>("/api/billing/portal");
+export const getMe = () => fetchJson<{ ok: true; user: AuthUser }>("/api/auth/me");
+// userId links the key to an account — without it the key 402s
+// (key_not_linked) once PLAN_ENFORCEMENT is on.
+export const createApiKey = (name: string, userId?: string) =>
   postJson<{ ok: true; key: ApiKeyEntry; apiKey: string }>("/api/server/config/api-keys", {
     name,
+    userId,
   });

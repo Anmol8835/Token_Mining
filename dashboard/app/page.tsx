@@ -15,6 +15,7 @@ import { DataTable, type Column } from "@/app/components/data-table";
 import { StatTile } from "@/app/components/stat-tile";
 import { Button, EmptyState, Panel, Segmented, Badge } from "@/app/components/ui";
 import { OverviewSkeleton } from "@/app/components/skeletons";
+import { AccountUsage } from "@/app/components/account-usage";
 
 const MODE_LABEL: Record<string, string> = {
   cheap: "Cost",
@@ -162,6 +163,10 @@ export default function Overview() {
           </Button>
         </div>
       </div>
+
+      {/* Per-account durable totals (SQLite usage_daily) — separate
+          from the live session/all-time metrics below. */}
+      <AccountUsage />
 
       {!m ? (
         <OverviewSkeleton />

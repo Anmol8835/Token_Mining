@@ -14,6 +14,8 @@ const { getLastUserMessage, extractSystemText } = require("./lib/classifier/text
 const metrics = require("./lib/metrics");
 const prefs = require("./lib/prefs");
 const apiKeys = require("./lib/api-keys");
+const plans = require("./lib/plans");
+const webhooks = require("./lib/webhooks");
 const {
   META_TOOL_NAME,
   buildPrunedBody,
@@ -103,7 +105,95 @@ function requireApiKey(req, res, next) {
       error: { type: "authentication_error", message: "invalid x-api-key" },
     });
   }
+  // Verified key rides along — metrics.record() attributes the
+  // request to entry.userId for the per-account usage_daily store.
+  req.apiKey = entry;
   next();
+}
+
+/**
+ * Plan enforcement for the two /v1/* routes — runs AFTER
+ * requireApiKey (needs req.apiKey.userId), so mount it second:
+ *   app.post("/v1/messages", requireApiKey, requireActivePlan, ...)
+ *
+ * Off by default: PLAN_ENFORCEMENT=1 turns on paid-plan gating.
+ * The rollout deploys this dormant, the operator subscribes, then
+ * the flag flips (and it doubles as the rollback switch).
+ *
+ * Skipped in bootstrap mode (zero keys => unauthenticated traffic
+ * has no account to enforce). On success sets req.plan for the
+ * tier gates downstream: { allowedTiers: string[]|null }.
+ */
+function requireActivePlan(req, res, next) {
+  if (process.env.PLAN_ENFORCEMENT !== "1" || !req.apiKey) {
+    req.plan = { allowedTiers: null };
+    return next();
+  }
+  const userId = req.apiKey.userId;
+  if (!userId) {
+    return res.status(402).json({
+      type: "error",
+      error: {
+        type: "subscription_required",
+        code: "key_not_linked",
+        message:
+          "This API key isn't linked to an account. Recreate it from the dashboard (API Keys page), then subscribe.",
+      },
+    });
+  }
+  const state = plans.getUserPlanState(userId);
+  if (state.userStatus === "suspended") {
+    return res.status(403).json({
+      type: "error",
+      error: {
+        type: "account_suspended",
+        code: "account_suspended",
+        message: "Account suspended.",
+      },
+    });
+  }
+  if (!state.effectivePlan) {
+    return res.status(402).json({
+      type: "error",
+      error: {
+        type: "subscription_required",
+        code: "no_active_subscription",
+        message: "No active subscription. Subscribe in the dashboard's Billing page to use the API.",
+      },
+    });
+  }
+  const quota = plans.checkQuota(userId, state.planId);
+  if (!quota.ok) {
+    return res.status(402).json({
+      type: "error",
+      error: {
+        type: "quota_exceeded",
+        code: "quota_exceeded",
+        message: `Monthly usage quota reached ($${quota.usedUsd.toFixed(2)} of $${quota.quotaUsd}). It resets on the 1st (UTC).`,
+        usageUsd: quota.usedUsd,
+        quotaUsd: quota.quotaUsd,
+      },
+    });
+  }
+  req.plan = { allowedTiers: state.effectivePlan.tiers };
+  next();
+}
+
+/**
+ * 403 for a model outside the caller's plan tiers. Only called
+ * when req.plan.allowedTiers is set (enforcement on + subscribed).
+ */
+function tierDenial(res, model) {
+  return res.status(403).json({
+    type: "error",
+    error: {
+      type: "model_tier_denied",
+      code: "model_tier_denied",
+      model: model.id,
+      tier: plans.modelTier(model),
+      message: `Model "${model.id}" isn't available on your plan (${plans.modelTier(model)} tier). Upgrade to reach it.`,
+    },
+  });
 }
 
 /**
@@ -188,7 +278,17 @@ function loadConfig() {
 const app = express();
 const PORT = process.env.PORT || 8002;
 
-app.use(express.json({ limit: "50mb" }));
+app.use(
+  express.json({
+    limit: "50mb",
+    // Standard Webhooks signatures cover the raw request bytes —
+    // preserve them for the Dodo webhook route only (re-serializing
+    // the parsed body would change the bytes and break verification).
+    verify: (req, _res, buf) => {
+      if (req.path === "/webhooks/dodo") req.rawBody = buf;
+    },
+  })
+);
 
 // Dashboard — served from public/
 app.use(express.static(path.join(__dirname, "public")));
@@ -508,7 +608,7 @@ function emitConvertedAsSSE(res, converted, modelId) {
 // Returns ONLY the classification JSON. Never answers the prompt.
 // ============================================================
 
-app.post("/v1/classify", requireApiKey, async (req, res) => {
+app.post("/v1/classify", requireApiKey, requireActivePlan, async (req, res) => {
   const startTime = Date.now();
   try {
     const debug = req.query.debug === "1" || req.headers["x-debug"] === "1";
@@ -525,6 +625,7 @@ app.post("/v1/classify", requireApiKey, async (req, res) => {
       classifierCost: classification.metadata?.classifierCost || null,
       route: null,
       providerResult: null,
+      userId: req.apiKey?.userId || null,
     });
 
     // DEBUG: classifier-only cost breakdown.
@@ -554,7 +655,7 @@ app.post("/v1/classify", requireApiKey, async (req, res) => {
 // POST /v1/messages
 // ============================================================
 
-app.post("/v1/messages", requireApiKey, async (req, res) => {
+app.post("/v1/messages", requireApiKey, requireActivePlan, async (req, res) => {
   const startTime = Date.now();
   const promptText = getLastUserMessage(req.body.messages).replace(/\s+/g, " ").trim();
   console.log(`▶ prompt: ${promptText.slice(0, 160) || "(empty)"}`);
@@ -600,6 +701,16 @@ app.post("/v1/messages", requireApiKey, async (req, res) => {
       }
     }
 
+    // Plan tier gate — explicit model requests are denied before
+    // any classifier or provider work happens.
+    if (
+      selectedModel &&
+      req.plan?.allowedTiers &&
+      !req.plan.allowedTiers.includes(plans.modelTier(selectedModel))
+    ) {
+      return tierDenial(res, selectedModel);
+    }
+
     if (!selectedModel) {
       // Auto mode: classify + route
       // Strip system prompt during classification — classifiers should
@@ -618,11 +729,36 @@ app.post("/v1/messages", requireApiKey, async (req, res) => {
       const validModes = ["cheap", "fast", "balanced", "quality"];
       const effectiveMode = validModes.includes(routingMode) ? routingMode : "cheap";
 
-      routeResult = selectModel(
-        classification, registry, serverConfig.router, null,
-        effectiveMode, prefs.getDisabledModels()
-      );
+      try {
+        routeResult = selectModel(
+          classification, registry, serverConfig.router, null,
+          effectiveMode, prefs.getDisabledModels(), req.plan?.allowedTiers ?? null
+        );
+      } catch (err) {
+        // Plan tiers emptied the candidate pool — a plan denial,
+        // not a server fault.
+        if (err.code === "TIER_EXHAUSTED") {
+          return res.status(403).json({
+            type: "error",
+            error: {
+              type: "model_tier_denied",
+              code: "model_tier_denied",
+              message: "No model in your plan's tiers can serve this request.",
+            },
+          });
+        }
+        throw err;
+      }
       selectedModel = routeResult.model;
+
+      // Definitive post-check — covers every router escape hatch
+      // (widen blocks, policy filter, fallback branches).
+      if (
+        req.plan?.allowedTiers &&
+        !req.plan.allowedTiers.includes(plans.modelTier(selectedModel))
+      ) {
+        return tierDenial(res, selectedModel);
+      }
 
       // Surface the classification: always as a header, and in the
       // response body when debug is requested (non-streaming only).
@@ -651,7 +787,19 @@ app.post("/v1/messages", requireApiKey, async (req, res) => {
     // uncompacted.
     let compactionResult = null;
     let compactionCost = null;
-    if (serverConfig.compaction?.enabled !== false) {
+    // Plan tier gate for the internal compaction model: if the
+    // caller's plan excludes its tier, skip compaction (the request
+    // proceeds uncompacted) rather than spend outside the plan.
+    const compactionModelId = serverConfig.compaction?.model || "deepseek-flash";
+    const compactionModel = registry.getModel(compactionModelId);
+    const compactionAllowed =
+      !req.plan?.allowedTiers ||
+      !compactionModel ||
+      req.plan.allowedTiers.includes(plans.modelTier(compactionModel));
+    if (!compactionAllowed && serverConfig.compaction?.enabled !== false) {
+      console.log(`[plan] compaction skipped (${compactionModelId} tier not in plan)`);
+    }
+    if (serverConfig.compaction?.enabled !== false && compactionAllowed) {
       try {
         compactionResult = await maybeCompact(req.body, { serverConfig, registry, selectedModel });
         if (compactionResult) {
@@ -828,6 +976,15 @@ app.post("/v1/messages", requireApiKey, async (req, res) => {
 
         if (!fallbackModel || !fallbackProvider) continue;
 
+        // Plan tier gate — never fail over into a disallowed tier.
+        if (
+          req.plan?.allowedTiers &&
+          !req.plan.allowedTiers.includes(plans.modelTier(fallbackModel))
+        ) {
+          console.warn(`[plan] fallback ${fallbackModel.id} skipped (tier not in plan)`);
+          continue;
+        }
+
         fallbacksUsed++;
         try {
           await serveModel(fallbackModel, fallbackProvider, req.body);
@@ -865,6 +1022,7 @@ app.post("/v1/messages", requireApiKey, async (req, res) => {
         providerFallbacks: fallbacksUsed,
         providerResult: servingAttempt,
         compaction: compactionResult,
+        userId: req.apiKey?.userId || null,
       });
 
       // DEBUG: token + cost breakdown for this request.
@@ -911,10 +1069,43 @@ app.get("/health", (req, res) => {
   });
 });
 
+// ------------------------------------------------------------
+// Dodo Payments webhook — authenticated by Dodo's Standard
+// Webhooks signature (DODO_PAYMENTS_WEBHOOK_KEY), NOT by the
+// admin token, so it must stay OUTSIDE the /config,/metrics
+// admin gate below. Caddy routes /webhooks/* here publicly.
+// 200 = processed (or duplicate); 500 = DB failure (Dodo
+// retries); 401 = bad signature (no retry — payload is garbage).
+// ------------------------------------------------------------
+app.post("/webhooks/dodo", (req, res) => {
+  if (!process.env.DODO_PAYMENTS_WEBHOOK_KEY) {
+    console.warn("[webhooks] DODO_PAYMENTS_WEBHOOK_KEY unset — refusing (Dodo will retry)");
+    return res.status(503).json({ ok: false, error: "webhooks not configured" });
+  }
+  let event;
+  try {
+    event = webhooks.verify(req.rawBody, req.headers);
+  } catch (err) {
+    console.warn("[webhooks] signature verification failed:", err.message);
+    return res.status(401).json({ ok: false, error: "invalid signature" });
+  }
+  // processEvent is synchronous (better-sqlite3); a throw here is
+  // a DB failure — 500 so Dodo retries.
+  try {
+    const result = webhooks.processEvent(event, req.headers["webhook-id"]);
+    console.log(`[webhooks] ${event.type} -> ${result.status}${result.error ? ` (${result.error})` : ""}`);
+    res.json({ ok: true, status: result.status });
+  } catch (err) {
+    console.error("[webhooks] processing failed:", err.message);
+    res.status(500).json({ ok: false });
+  }
+});
+
 // Admin-only zone (see adminGate above). Mounted before the route
 // declarations so every /config/* and /metrics* route below is
-// gated when ADMIN_TOKEN is set. /health and /v1/* are declared
-// above and stay ungated; the static middleware is unaffected.
+// gated when ADMIN_TOKEN is set. /health, /v1/* and /webhooks/*
+// are declared above and stay ungated; the static middleware is
+// unaffected.
 app.use(["/config", "/metrics"], adminGate);
 
 // ============================================================
@@ -1132,7 +1323,10 @@ app.get("/config/api-keys", (req, res) => {
 });
 
 app.post("/config/api-keys", (req, res) => {
-  const created = apiKeys.createKey(req.body?.name);
+  // The dashboard passes the signed-in user's id so the key is
+  // attributed for usage rollups and can pass the plan gate.
+  const userId = typeof req.body?.userId === "string" ? req.body.userId : null;
+  const created = apiKeys.createKey(req.body?.name, userId);
   if (!created) {
     return res.status(400).json({
       ok: false,
@@ -1173,6 +1367,13 @@ app.listen(PORT, () => {
   console.log(`   GET  /health         — Server status`);
   console.log(
     `   debug dump  : ${process.env.DEBUG_DUMP === "1" ? "ON (system.txt)" : "off"}`
+  );
+  console.log(
+    `   plans       : ${
+      process.env.PLAN_ENFORCEMENT === "1"
+        ? `ENFORCING (env=${plans.environment})`
+        : "off (PLAN_ENFORCEMENT unset)"
+    }`
   );
   console.log(
     `   admin gate  : ${
