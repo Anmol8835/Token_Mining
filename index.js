@@ -199,25 +199,63 @@ function tierDenial(res, model) {
 }
 
 /**
- * Admin token auth — gates /config/* and /metrics* on cloud
- * deployments. ADMIN_TOKEN unset => the gate is a no-op (local dev
- * unchanged). Set => every admin request needs an x-admin-token
- * header. /health and /v1/* are deliberately NOT gated (health checks
- * + API keys respectively).
+ * Actor resolution for the /config/* and /metrics* surface.
+ *
+ * Historically one shared ADMIN_TOKEN gated these routes and the
+ * dashboard injected it for EVERY signed-in user — so every account
+ * was effectively an operator and saw every other account's keys,
+ * prompts and usage. Instead, resolve WHO is calling:
+ *
+ *   - valid x-admin-token          -> operator (full console; the
+ *     token comparison is timing-safe and always wins)
+ *   - valid steeros_session cookie -> user (scoped to its own keys,
+ *     usage and activity)
+ *   - no ADMIN_TOKEN configured    -> operator (local dev: the old
+ *     gate was a no-op there)
+ *   - anything else                -> 401 (fail closed)
+ *
+ * /health and /v1/* are deliberately NOT gated (health checks + API
+ * keys respectively); /auth/* sits above this mount too.
  */
-function adminGate(req, res, next) {
+function attachActor(req, res, next) {
   const token = process.env.ADMIN_TOKEN;
-  if (!token) return next(); // local dev: open
   const given = req.headers["x-admin-token"];
-  if (typeof given !== "string") {
-    return res.status(401).json({ ok: false, error: "invalid admin token" });
+  if (token && typeof given === "string") {
+    const a = Buffer.from(given);
+    const b = Buffer.from(token);
+    if (a.length === b.length && crypto.timingSafeEqual(a, b)) {
+      req.actor = { role: "operator", user: authApi.getSessionUserFromRequest(req) };
+      return next();
+    }
   }
-  const a = Buffer.from(given);
-  const b = Buffer.from(token);
-  if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) {
-    return res.status(401).json({ ok: false, error: "invalid admin token" });
+
+  const user = authApi.getSessionUserFromRequest(req);
+  if (user) {
+    req.actor = { role: "user", user };
+    return next();
   }
-  next();
+
+  if (!token) {
+    req.actor = { role: "operator", user: null };
+    return next();
+  }
+
+  return res.status(401).json({ ok: false, error: "authentication required" });
+}
+
+/**
+ * Operator-only guard for global mutations (metrics reset/eval/demo,
+ * model + routing toggles). Anonymous callers never get past
+ * attachActor; a signed-in plain user lands here as a 403 — except
+ * in local dev with no ADMIN_TOKEN, where the gate is off entirely
+ * (attachActor already treats anonymous callers as operators there,
+ * so this adds no new exposure; it keeps the pre-scoping dev
+ * workflow where every mutation just worked).
+ */
+function requireOperator(req, res, next) {
+  if (req.actor?.role === "operator") return next();
+  if (!process.env.ADMIN_TOKEN) return next(); // dev: gate off
+  return res.status(403).json({ ok: false, error: "admin token required" });
 }
 
 // ============================================================
@@ -1075,7 +1113,7 @@ app.get("/health", (req, res) => {
 // Dodo Payments webhook — authenticated by Dodo's Standard
 // Webhooks signature (DODO_PAYMENTS_WEBHOOK_KEY), NOT by the
 // admin token, so it must stay OUTSIDE the /config,/metrics
-// admin gate below. Caddy routes /webhooks/* here publicly.
+// actor gate below. Caddy routes /webhooks/* here publicly.
 // 200 = processed (or duplicate); 500 = DB failure (Dodo
 // retries); 401 = bad signature (no retry — payload is garbage).
 // ------------------------------------------------------------
@@ -1108,7 +1146,7 @@ app.post("/webhooks/dodo", (req, res) => {
 // site (steerosai.com). SSO with the dashboard: same
 // users/sessions tables, shared steeros_session cookie
 // (Domain=.steerosai.com via AUTH_COOKIE_DOMAIN). Open signup by
-// design — must stay OUTSIDE the /config,/metrics admin gate
+// design — must stay OUTSIDE the /config,/metrics actor gate
 // below. Caddy routes /auth/* here publicly.
 // ------------------------------------------------------------
 app.post("/auth/signup", authApi.signup);
@@ -1118,26 +1156,34 @@ app.get("/auth/me", authApi.me);
 
 // "Sign in with Google" — the whole OAuth dance runs here (start ->
 // Google -> callback), then 302s into the dashboard with the shared
-// steeros_session cookie. Also outside the admin gate.
+// steeros_session cookie. Also outside the actor gate.
 app.get("/auth/google/start", authGoogle.start);
 app.get("/auth/google/callback", authGoogle.callback);
 
-// Admin-only zone (see adminGate above). Mounted before the route
-// declarations so every /config/* and /metrics* route below is
-// gated when ADMIN_TOKEN is set. /health, /v1/*, /webhooks/* and
-// /auth/* are declared above and stay ungated; the static
-// middleware is unaffected.
-app.use(["/config", "/metrics"], adminGate);
+// Authenticated zone (see attachActor above). Mounted before the
+// route declarations so every /config/* and /metrics* route below
+// resolves its actor (operator | user | 401). /health, /v1/*,
+// /webhooks/* and /auth/* are declared above and stay ungated; the
+// static middleware is unaffected.
+app.use(["/config", "/metrics"], attachActor);
 
 // ============================================================
 // Metrics endpoints — consumed by the dashboard in public/
 // ============================================================
 
 app.get("/metrics", (req, res) => {
-  res.json(metrics.snapshot());
+  // Operator: the whole process. Anyone else: scoped to their own
+  // account — session aggregates, their ring-buffer records and
+  // usage_daily-backed all-time totals.
+  const actor = req.actor;
+  const snapshot = metrics.snapshot(
+    actor.role === "operator" ? null : actor.user.id
+  );
+  snapshot.viewer = { role: actor.role, userId: actor.user?.id ?? null };
+  res.json(snapshot);
 });
 
-app.post("/metrics/reset", (req, res) => {
+app.post("/metrics/reset", requireOperator, (req, res) => {
   metrics.reset();
   // ?global=1 also wipes the persisted all-time counter.
   if (req.query.global === "1") metrics.resetGlobal();
@@ -1146,7 +1192,7 @@ app.post("/metrics/reset", (req, res) => {
 
 // Run the labeled eval set (config/eval-prompts.json) through the
 // real classifier and store the accuracy summary for the dashboard.
-app.post("/metrics/eval", async (req, res) => {
+app.post("/metrics/eval", requireOperator, async (req, res) => {
   try {
     const summary = await runEvalSet(
       classifier,
@@ -1163,7 +1209,7 @@ app.post("/metrics/eval", async (req, res) => {
 // Generate a burst of representative traffic through the REAL
 // classifier + router (no provider calls) so the dashboard can be
 // evaluated without hammering the APIs.
-app.post("/metrics/demo", async (req, res) => {
+app.post("/metrics/demo", requireOperator, async (req, res) => {
   const DEMO_PROMPTS = [
     "hi",
     "What is the current stock price of NVDA right now?",
@@ -1283,7 +1329,7 @@ app.get("/config/dashboard", (req, res) => {
 });
 
 // Toggle a model in/out of the auto-routing candidate pool.
-app.post("/config/models", (req, res) => {
+app.post("/config/models", requireOperator, (req, res) => {
   const { id, enabled } = req.body || {};
   if (typeof id !== "string" || typeof enabled !== "boolean") {
     return res
@@ -1304,7 +1350,7 @@ app.post("/config/models", (req, res) => {
 });
 
 // Set the default routing mode (cheap | fast | balanced | quality).
-app.post("/config/routing", (req, res) => {
+app.post("/config/routing", requireOperator, (req, res) => {
   const { mode } = req.body || {};
   const updated = prefs.setRoutingMode(mode);
   if (updated === null) {
@@ -1319,7 +1365,7 @@ app.post("/config/routing", (req, res) => {
 // Switch the active classifier (auto | llm | jev). Applies live —
 // classify() reads the mode per request — and persists across
 // restarts via dashboard prefs.
-app.post("/config/classifier", (req, res) => {
+app.post("/config/classifier", requireOperator, (req, res) => {
   const { mode } = req.body || {};
   const updated = prefs.setClassifierMode(mode);
   if (updated === null) {
@@ -1336,17 +1382,31 @@ app.post("/config/classifier", (req, res) => {
 // API key management — consumed by the dashboard's API Keys page.
 // NOTE: once the first key exists, /v1/messages and /v1/classify
 // require a valid key (see requireApiKey above); these endpoints
-// stay ungated so keys can always be managed.
+// are gated by attachActor (operator sees all keys, a signed-in
+// user only theirs) so keys can always be managed.
 // ------------------------------------------------------------
 
+/** The key list as the current actor should see it. */
+function keysForActor(actor) {
+  return actor.role === "operator"
+    ? apiKeys.listKeys()
+    : apiKeys.listKeysForUser(actor.user.id);
+}
+
 app.get("/config/api-keys", (req, res) => {
-  res.json({ keys: apiKeys.listKeys() });
+  res.json({ keys: keysForActor(req.actor) });
 });
 
 app.post("/config/api-keys", (req, res) => {
-  // The dashboard passes the signed-in user's id so the key is
-  // attributed for usage rollups and can pass the plan gate.
-  const userId = typeof req.body?.userId === "string" ? req.body.userId : null;
+  // The key is attributed from the ACTOR, never from client input:
+  // a signed-in user always gets their own id (an unlinked key is
+  // rejected 402 key_not_linked once plan enforcement is on), and
+  // only an operator may attribute a key to another account.
+  const actor = req.actor;
+  const userId =
+    actor.role === "operator"
+      ? (typeof req.body?.userId === "string" ? req.body.userId : actor.user?.id ?? null)
+      : actor.user.id;
   const created = apiKeys.createKey(req.body?.name, userId);
   if (!created) {
     return res.status(400).json({
@@ -1359,13 +1419,20 @@ app.post("/config/api-keys", (req, res) => {
 });
 
 app.delete("/config/api-keys/:id", (req, res) => {
-  if (!apiKeys.revokeKey(req.params.id)) {
+  const actor = req.actor;
+  // Ownership is part of the UPDATE for users, so another account's
+  // key behaves exactly like an unknown id: 404, key stays live.
+  const revoked =
+    actor.role === "operator"
+      ? apiKeys.revokeKey(req.params.id)
+      : apiKeys.revokeKeyForUser(req.params.id, actor.user.id);
+  if (!revoked) {
     return res.status(404).json({
       ok: false,
       error: `Unknown key id "${req.params.id}"`,
     });
   }
-  res.json({ ok: true, keys: apiKeys.listKeys() });
+  res.json({ ok: true, keys: keysForActor(actor) });
 });
 
 // ============================================================
@@ -1397,10 +1464,10 @@ app.listen(PORT, () => {
     }`
   );
   console.log(
-    `   admin gate  : ${
+    `   actor gate  : ${
       process.env.ADMIN_TOKEN
-        ? "active (x-admin-token for /config/*, /metrics*)"
-        : "off (no ADMIN_TOKEN set)"
+        ? "active (x-admin-token = operator, session = scoped user, else 401)"
+        : "off (no ADMIN_TOKEN set — every /config, /metrics caller is operator)"
     }\n`
   );
 });

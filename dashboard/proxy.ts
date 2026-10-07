@@ -23,6 +23,8 @@ import { getSessionUser, SESSION_COOKIE } from "@/lib/auth";
  * to /login; pages then bounce through login anyway. Acceptable —
  * the fetch fails and the page shows its stale-state note.
  */
+let warnedNoOperator = false;
+
 export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
@@ -46,8 +48,25 @@ export function proxy(request: NextRequest) {
   }
 
   const headers = new Headers(request.headers);
-  const token = process.env.ADMIN_TOKEN;
-  if (token) headers.set("x-admin-token", token); // overwrites client-supplied
+  // Operator-only token injection. x-admin-token unlocks the GLOBAL
+  // console on the Express side (every account's keys, usage and
+  // prompts), so only the OPERATOR_EMAIL account may carry it —
+  // everyone else's /api/server/* requests go through with just
+  // their session cookie and the backend scopes the response to
+  // them. Fail closed: no OPERATOR_EMAIL (or a mismatch) => no token
+  // is ever injected, and a client-supplied one is stripped.
+  headers.delete("x-admin-token");
+  const operatorEmail = process.env.OPERATOR_EMAIL;
+  if (process.env.ADMIN_TOKEN && operatorEmail) {
+    if (user.email.toLowerCase() === operatorEmail.toLowerCase()) {
+      headers.set("x-admin-token", process.env.ADMIN_TOKEN);
+    }
+  } else if (process.env.ADMIN_TOKEN && !warnedNoOperator) {
+    warnedNoOperator = true;
+    console.warn(
+      "[proxy] ADMIN_TOKEN is set but OPERATOR_EMAIL is not — no operator token will be injected (fail closed)"
+    );
+  }
   return NextResponse.next({ request: { headers } });
 }
 

@@ -42,6 +42,10 @@ export default function ActivityPage() {
   const records = m?.allRecords ?? [];
   const pages = Math.max(1, Math.ceil(records.length / PAGE_SIZE));
   const pageRows = records.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
+  // Demo/eval/reset mutate the whole process — operator only (the
+  // backend 403s plain users; hiding the buttons keeps that out of
+  // the UI).
+  const isOperator = m?.viewer?.role === "operator";
 
   async function runAction(kind: "demo" | "reset" | "eval") {
     setBusy(kind);
@@ -66,15 +70,19 @@ export default function ActivityPage() {
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <Button onClick={() => runAction("demo")} pending={busy === "demo"}>
-            Generate demo traffic
-          </Button>
-          <Button onClick={() => runAction("eval")} pending={busy === "eval"}>
-            Run eval set
-          </Button>
-          <Button onClick={() => runAction("reset")} pending={busy === "reset"}>
-            Reset session
-          </Button>
+          {isOperator && (
+            <>
+              <Button onClick={() => runAction("demo")} pending={busy === "demo"}>
+                Generate demo traffic
+              </Button>
+              <Button onClick={() => runAction("eval")} pending={busy === "eval"}>
+                Run eval set
+              </Button>
+              <Button onClick={() => runAction("reset")} pending={busy === "reset"}>
+                Reset session
+              </Button>
+            </>
+          )}
         </div>
       </div>
 
@@ -85,8 +93,18 @@ export default function ActivityPage() {
       {records.length === 0 ? (
         <EmptyState
           title="No requests yet"
-          body="Generate demo traffic or send requests to POST /v1/messages on the router. This table holds up to 250 records per session."
-          action={<Button variant="primary" onClick={() => runAction("demo")}>Generate demo traffic</Button>}
+          body={
+            isOperator
+              ? "Generate demo traffic or send requests to POST /v1/messages on the router. This table holds up to 250 records per session."
+              : "Send requests to POST /v1/messages with one of your API keys to see them here. This table holds up to 250 records per session."
+          }
+          action={
+            isOperator ? (
+              <Button variant="primary" onClick={() => runAction("demo")}>
+                Generate demo traffic
+              </Button>
+            ) : undefined
+          }
         />
       ) : (
         <Panel title="Requests" note={`${fmtInt(records.length)} total, page ${page + 1} of ${pages}`}>

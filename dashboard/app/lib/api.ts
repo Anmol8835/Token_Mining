@@ -115,6 +115,13 @@ export type MetricsSnapshot = {
   eval: EvalSummary | null;
   recent: RecordRow[];
   allRecords: RecordRow[];
+  /**
+   * Who the backend resolved this snapshot for. "operator" = the
+   * global console (all accounts); "user" = scoped to the signed-in
+   * account. Operator-only actions (demo/reset/eval) are hidden from
+   * plain users.
+   */
+  viewer?: { role: "user" | "operator"; userId?: string | null };
 };
 
 export type ModelCatalogEntry = {
@@ -276,10 +283,11 @@ export const postCheckout = (planId?: string) =>
   });
 export const getPortalUrl = () => fetchJson<{ ok: true; url: string }>("/api/billing/portal");
 export const getMe = () => fetchJson<{ ok: true; user: AuthUser }>("/api/auth/me");
-// userId links the key to an account — without it the key 402s
-// (key_not_linked) once PLAN_ENFORCEMENT is on.
-export const createApiKey = (name: string, userId?: string) =>
+// The backend attributes the key to the signed-in session — no
+// userId is sent from the client (a client-supplied one is ignored
+// for non-operators; an unlinked key 402s key_not_linked once
+// PLAN_ENFORCEMENT is on).
+export const createApiKey = (name: string) =>
   postJson<{ ok: true; key: ApiKeyEntry; apiKey: string }>("/api/server/config/api-keys", {
     name,
-    userId,
   });

@@ -95,6 +95,7 @@ OPENAI_API_KEY=...
 GOOGLE_API_KEY=...          # optional (or GEMINI_API_KEY)
 TYPESAFE_API_KEY=...        # REQUIRED: config/server.json classifier.mode is "jev"
 ADMIN_TOKEN=<output of: openssl rand -hex 32>
+OPERATOR_EMAIL=you@example.com       # the ONE account that gets the global console
 DOMAIN=api.example.com
 
 # --- Billing (Dodo Payments) — see "Billing rollout" below ---
@@ -148,8 +149,12 @@ docker compose exec llm-proxy node db/create-user.js you@example.com "Your Name"
 Then open `https://<DOMAIN>/` — you'll land on `/login`; after signing
 in you get the console (overview, models, routing, activity, API keys,
 billing). `proxy.ts` is the auth chokepoint: every page and `/api/*`
-call needs the session cookie, and the admin token is only injected
-server-side for signed-in requests. `/health` stays public
+call needs the session cookie. Only the account matching
+`OPERATOR_EMAIL` gets the admin token injected server-side and sees the
+operator console (global metrics, demo/reset/eval, model + routing
+toggles); every other account is strictly scoped — its own keys, its own
+activity, its own usage_daily totals. If `OPERATOR_EMAIL` is unset no
+token is injected for anyone (fail closed). `/health` stays public
 (healthchecks + model ids only).
 
 **Open signup**: anyone can create an account at `https://<DOMAIN>/signup`
@@ -189,14 +194,22 @@ curl -s -X POST https://api.example.com/config/api-keys \
 Save the returned `apiKey` (`sk-relay-…`) somewhere safe — **it is shown
 exactly once**.
 
-Keys created before accounts existed have `user_id NULL`. Backfill them
-(replace the id; check with `GET /config/api-keys`):
+Keys created before accounts existed have `user_id NULL` and don't show
+up in any scoped account. Attach them with the backfill tool — dry-run
+by default, `--apply` writes; only NULL-owned keys are ever touched
+(never silently reassigned from another owner):
 
 ```sh
-docker compose exec -T llm-proxy node -e "
-  const db = require('./lib/db');
-  db.prepare(\"UPDATE api_keys SET user_id=? WHERE user_id IS NULL\").run('<user-uuid>');"
+# list every unowned key (dry run)
+docker compose exec -T llm-proxy node db/backfill.js claim-keys you@example.com
+
+# attach the ones you mean to your account (id or email both work)
+docker compose exec -T llm-proxy node db/backfill.js claim-keys you@example.com --apply
 ```
+
+`claim-usage` does the same for `usage_daily` rows recorded as
+`'anonymous'` (pre-account traffic), with `--merge` to sum a day into an
+existing row instead of skipping it.
 
 ## 7. Verify
 
@@ -262,6 +275,11 @@ docker builder prune -f          # reclaim build-cache disk after updates
   so you can create a fresh key (step 6). A forgotten dashboard password is
   recovered with `db/create-user.js --reset` (step 5b).
 - **Rotating ADMIN_TOKEN**: edit `.env`, `docker compose up -d` to apply.
+- **Operator account**: `OPERATOR_EMAIL` names the one account that gets the
+  global console; everyone else is scoped to their own keys/usage. Change it
+  in `.env` + `docker compose up -d` (recreates the containers with the new
+  value). Unowned legacy keys/usage are attached with `db/backfill.js`
+  (step 6).
 - **More keys**: repeat the step-6 curl with a different name; revoke with
   `curl -X DELETE https://api.example.com/config/api-keys/<id> -H "x-admin-token: …"`
   (ids come from `GET /config/api-keys` with the token).
@@ -342,7 +360,7 @@ that write into this stack's SQLite through the proxy's public auth API —
 so an account created at `steerosai.com` works immediately in the console
 and at checkout, and one login covers both hosts.
 
-- **Endpoints** (public, outside the admin gate; Caddy's `/auth*` handle
+- **Endpoints** (public, outside the actor gate; Caddy's `/auth*` handle
   routes them to llm-proxy): `POST /auth/signup`, `POST /auth/login`,
   `POST /auth/logout`, `GET /auth/me`. Same validation, statuses
   (`pending`/`none` on signup), session format and rate limiting as the
