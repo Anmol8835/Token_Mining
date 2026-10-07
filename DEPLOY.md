@@ -371,3 +371,61 @@ curl -i -X POST https://app.steerosai.com/auth/signup \
 Then log in with that account at `https://steerosai.com/login` and open
 `https://app.steerosai.com/` — the console must show it logged in without
 a second login (and logout from either side must clear both).
+
+## 12. Sign in with Google
+
+"Continue with Google" on the site and dashboard. The whole OAuth dance
+runs on this proxy — the VPS exchanges the code, upserts the user, mints
+the same `steeros_session` cookie as email login, and 302s into the
+dashboard. Buttons are plain links to `/auth/google/start`; the
+`client_secret` never leaves the VPS, and Caddy's existing `/auth*` handle
+already routes these (no Caddy restart needed).
+
+### Google Cloud Console (one-time)
+
+1. console.cloud.google.com → create/select a project → **APIs &
+   Services → OAuth consent screen**: scopes `openid email profile`; add
+   each test account under **Test users** (the app stays in "Testing"
+   until published — only test users can sign in).
+2. **Credentials → Create credentials → OAuth client ID → Web
+   application**, with authorized redirect URIs:
+   - `https://app.steerosai.com/auth/google/callback` (production)
+   - `http://localhost:8002/auth/google/callback` (local dev)
+
+### Env (VPS `.env`, chmod 600 — never commit)
+
+```
+GOOGLE_CLIENT_ID=….apps.googleusercontent.com
+GOOGLE_CLIENT_SECRET=…
+# Optional — defaults to https://$DOMAIN/auth/google/callback:
+# GOOGLE_REDIRECT_URI=
+```
+
+Then `docker compose up -d` (recreates llm-proxy with the new env).
+
+### Canaries
+
+```sh
+# Before creds land: 503 (safe to ship first; email auth unaffected)
+curl -s https://app.steerosai.com/auth/google/start
+
+# After creds: 302 to Google + host-only, path-scoped state cookie
+curl -si https://app.steerosai.com/auth/google/start | grep -Ei 'location|set-cookie'
+#   Location: https://accounts.google.com/o/oauth2/v2/auth?...
+#   Set-Cookie: steeros_oauth_state=…; Path=/auth/google; HttpOnly; SameSite=Lax
+
+# Garbage code / bad state: bounced to the login banner, cookie cleared
+curl -si "https://app.steerosai.com/auth/google/callback?code=garbage&state=x" \
+  | grep -Ei 'location|set-cookie'
+#   Location: https://app.steerosai.com/login?error=google
+```
+
+### Hand-test checklist
+
+- Existing Google account → lands on the dashboard signed in.
+- Brand-new Google account → `/billing`; DB row is `pending`/`none` with a
+  bcrypt hash (email/password login with any password → 401).
+- Suspended user → `/login?error=suspended`, no session.
+- Start at `https://www.steerosai.com/login` → same dance; the cookie
+  covers site + dashboard (log out from either side clears both).
+- `/login?error=google` shows the banner; refresh clears the query param.

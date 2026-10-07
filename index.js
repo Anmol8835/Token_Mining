@@ -17,6 +17,7 @@ const apiKeys = require("./lib/api-keys");
 const plans = require("./lib/plans");
 const webhooks = require("./lib/webhooks");
 const authApi = require("./lib/auth-api");
+const authGoogle = require("./lib/auth-google");
 const {
   META_TOOL_NAME,
   buildPrunedBody,
@@ -1114,6 +1115,12 @@ app.post("/auth/signup", authApi.signup);
 app.post("/auth/login", authApi.login);
 app.post("/auth/logout", authApi.logout);
 app.get("/auth/me", authApi.me);
+
+// "Sign in with Google" — the whole OAuth dance runs here (start ->
+// Google -> callback), then 302s into the dashboard with the shared
+// steeros_session cookie. Also outside the admin gate.
+app.get("/auth/google/start", authGoogle.start);
+app.get("/auth/google/callback", authGoogle.callback);
 
 // Admin-only zone (see adminGate above). Mounted before the route
 // declarations so every /config/* and /metrics* route below is

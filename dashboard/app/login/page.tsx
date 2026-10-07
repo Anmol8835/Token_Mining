@@ -1,9 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowsSplit } from "@phosphor-icons/react";
+import { GoogleAuthLink } from "@/app/components/google-auth-link";
 
 /**
  * Login — the only page reachable without a session (proxy.ts
@@ -15,7 +16,23 @@ export default function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+
+  // Google OAuth failures land back here as /login?error=google|suspended.
+  // Read it once from the raw URL (useSearchParams would force a Suspense
+  // boundary during prerender), then strip the param so a refresh doesn't
+  // resurrect the banner.
+  useEffect(() => {
+    const reason = new URLSearchParams(window.location.search).get("error");
+    if (!reason) return;
+    setNotice(
+      reason === "suspended"
+        ? "This account is suspended. Contact support."
+        : "Google sign-in failed. Please try again, or use email sign-in.",
+    );
+    window.history.replaceState(null, "", window.location.pathname);
+  }, []);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -88,9 +105,9 @@ export default function Login() {
           />
         </label>
 
-        {error && (
+        {(error ?? notice) && (
           <p className="mt-4 rounded-lg border border-hairline bg-critical/10 px-3 py-2 text-[13px] text-critical">
-            {error}
+            {error ?? notice}
           </p>
         )}
 
@@ -103,6 +120,8 @@ export default function Login() {
         >
           {busy ? "Signing in..." : "Sign in"}
         </button>
+
+        <GoogleAuthLink />
 
         <p className="mt-4 text-center text-xs text-ink-3">
           New here?{" "}

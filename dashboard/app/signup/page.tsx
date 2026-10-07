@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowsSplit } from "@phosphor-icons/react";
+import { GoogleAuthLink } from "@/app/components/google-auth-link";
 
 /**
  * Signup — open registration, exempt from the proxy.ts session
@@ -136,6 +137,8 @@ export default function Signup() {
         >
           {busy ? "Creating account..." : "Create account"}
         </button>
+
+        <GoogleAuthLink />
 
         <p className="mt-4 text-center text-xs text-ink-3">
           Already have an account?{" "}
