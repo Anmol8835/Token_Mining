@@ -334,3 +334,40 @@ in test mode.
    Match the user by hand, then fix `subscriptions`/`users` with the same
    values the handler would have written (`plan`, `plan_expiry`,
    `status='active'`) and mark the event processed.
+
+## 11. Marketing-site SSO (steerosai.com)
+
+The marketing site (separate repo, deployed on Vercel) hosts signup/login
+that write into this stack's SQLite through the proxy's public auth API —
+so an account created at `steerosai.com` works immediately in the console
+and at checkout, and one login covers both hosts.
+
+- **Endpoints** (public, outside the admin gate; Caddy's `/auth*` handle
+  routes them to llm-proxy): `POST /auth/signup`, `POST /auth/login`,
+  `POST /auth/logout`, `GET /auth/me`. Same validation, statuses
+  (`pending`/`none` on signup), session format and rate limiting as the
+  dashboard's `/api/auth/*`.
+- **`AUTH_COOKIE_DOMAIN=.steerosai.com` in `.env` is the SSO linchpin** —
+  it widens the `steeros_session` cookie to the whole registrable domain.
+  Set it on the VPS; leave it unset locally (host-only cookie for dev).
+  If it's missing, site login still works but the dashboard never sees the
+  session.
+- The site calls these server-to-server through its own `/api/auth/*`
+  routes (Vercel → `https://app.steerosai.com/auth/*`) and relays the
+  `Set-Cookie` header back to the browser.
+- After re-rsyncing the Caddyfile change: `docker compose restart caddy`
+  (bind-mounted files aren't watched by compose).
+
+Verify the cookie attributes are right (the canary — `Domain` **and**
+`Secure` **and** `HttpOnly` must all appear):
+
+```sh
+curl -i -X POST https://app.steerosai.com/auth/signup \
+  -H "Content-Type: application/json" \
+  -d '{"email":"sso-check@example.com","password":"password123","name":"SSO Check"}' \
+  | grep -i set-cookie
+```
+
+Then log in with that account at `https://steerosai.com/login` and open
+`https://app.steerosai.com/` — the console must show it logged in without
+a second login (and logout from either side must clear both).

@@ -6,8 +6,8 @@ import { getDb } from "@/lib/db";
 import {
   createSession,
   hashPassword,
+  sessionCookieOptions,
   SESSION_COOKIE,
-  SESSION_TTL_MS,
 } from "@/lib/auth";
 
 // Open signup. New accounts land as status='pending', plan='none':
@@ -75,13 +75,7 @@ export async function POST(req: NextRequest) {
 
   const token = createSession(id);
   const jar = await cookies();
-  jar.set(SESSION_COOKIE, token, {
-    httpOnly: true,
-    sameSite: "lax",
-    secure: process.env.NODE_ENV === "production", // HTTPS behind Caddy
-    path: "/",
-    maxAge: SESSION_TTL_MS / 1000,
-  });
+  jar.set(SESSION_COOKIE, token, sessionCookieOptions());
 
   return NextResponse.json({
     ok: true,

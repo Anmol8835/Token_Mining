@@ -26,6 +26,12 @@
 		reverse_proxy llm-proxy:8002
 	}
 
+	# Public auth API for the marketing site — signup/login/logout/me
+	# (SSO with the dashboard via Domain=.steerosai.com cookies).
+	handle /auth* {
+		reverse_proxy llm-proxy:8002
+	}
+
 	handle {
 		reverse_proxy dashboard:3000
 	}

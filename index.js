@@ -16,6 +16,7 @@ const prefs = require("./lib/prefs");
 const apiKeys = require("./lib/api-keys");
 const plans = require("./lib/plans");
 const webhooks = require("./lib/webhooks");
+const authApi = require("./lib/auth-api");
 const {
   META_TOOL_NAME,
   buildPrunedBody,
@@ -1101,11 +1102,24 @@ app.post("/webhooks/dodo", (req, res) => {
   }
 });
 
+// ------------------------------------------------------------
+// Public auth API — signup/login/logout/me for the marketing
+// site (steerosai.com). SSO with the dashboard: same
+// users/sessions tables, shared steeros_session cookie
+// (Domain=.steerosai.com via AUTH_COOKIE_DOMAIN). Open signup by
+// design — must stay OUTSIDE the /config,/metrics admin gate
+// below. Caddy routes /auth/* here publicly.
+// ------------------------------------------------------------
+app.post("/auth/signup", authApi.signup);
+app.post("/auth/login", authApi.login);
+app.post("/auth/logout", authApi.logout);
+app.get("/auth/me", authApi.me);
+
 // Admin-only zone (see adminGate above). Mounted before the route
 // declarations so every /config/* and /metrics* route below is
-// gated when ADMIN_TOKEN is set. /health, /v1/* and /webhooks/*
-// are declared above and stay ungated; the static middleware is
-// unaffected.
+// gated when ADMIN_TOKEN is set. /health, /v1/*, /webhooks/* and
+// /auth/* are declared above and stay ungated; the static
+// middleware is unaffected.
 app.use(["/config", "/metrics"], adminGate);
 
 // ============================================================

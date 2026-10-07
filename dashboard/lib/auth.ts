@@ -12,6 +12,24 @@ import { getDb } from "./db";
 export const SESSION_COOKIE = "steeros_session";
 export const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
 
+/**
+ * Cookie attributes for the session cookie. AUTH_COOKIE_DOMAIN
+ * (VPS .env: .steerosai.com) widens the cookie to the whole
+ * registrable domain so a login on the marketing site is valid
+ * here too (SSO). Unset => host-only, which is what local dev
+ * wants. maxAge is SECONDS for the Next cookies API.
+ */
+export function sessionCookieOptions() {
+  return {
+    httpOnly: true,
+    sameSite: "lax" as const,
+    secure: process.env.NODE_ENV === "production", // HTTPS behind Caddy
+    path: "/",
+    maxAge: SESSION_TTL_MS / 1000,
+    ...(process.env.AUTH_COOKIE_DOMAIN ? { domain: process.env.AUTH_COOKIE_DOMAIN } : {}),
+  };
+}
+
 export type SessionUser = {
   id: string;
   email: string;
