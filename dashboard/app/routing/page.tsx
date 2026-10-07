@@ -93,6 +93,10 @@ export default function RoutingPage() {
   }
   const classCurrent = localClassMode ?? serverClassMode;
 
+  // Classifier mode is server-wide (live-mutates classifier.mode for
+  // every account), so its panel stays operator-only.
+  const isOperator = metrics?.viewer?.role === "operator";
+
   async function select(mode: string) {
     setPending(mode);
     setLocalMode(mode);
@@ -143,6 +147,7 @@ export default function RoutingPage() {
         <RoutingSkeleton />
       ) : (
         <>
+      {isOperator && (
       <Panel title="Classifier" note="applies live, persists across restarts">
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-3" role="radiogroup" aria-label="Classifier mode">
           {CLASSIFIER_MODES.map((mode) => {
@@ -182,6 +187,7 @@ export default function RoutingPage() {
           overrides classifier.mode in config/server.json on boot.
         </p>
       </Panel>
+      )}
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4" role="radiogroup" aria-label="Routing mode">
         {MODES.map((mode) => {
@@ -227,10 +233,11 @@ export default function RoutingPage() {
             <>
               The router currently defaults to{" "}
               <Badge tone="accent">{MODES.find((x) => x.value === current)?.label ?? current}</Badge>{" "}
-              when no header is present. A request header always wins, and the classifier can still
-              push individual requests up or down: a prompt that reads as quality-first gets the
-              quality mode regardless of this setting, and human-review recommendations always
-              escalate.
+              when no header is present
+              {!isOperator && " — your account's own choice, which overrides the server default"}.
+              A request header always wins, and the classifier can still push individual requests
+              up or down: a prompt that reads as quality-first gets the quality mode regardless of
+              this setting, and human-review recommendations always escalate.
             </>
           ) : (
             "No preference saved yet. The server defaults to cost mode until you pick one here."

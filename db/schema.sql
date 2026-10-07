@@ -102,6 +102,19 @@ CREATE TABLE IF NOT EXISTS request_events (
 CREATE INDEX IF NOT EXISTS idx_request_events_user_ts
   ON request_events(user_id, ts DESC);
 
+-- Per-user auto-routing preferences set from the dashboard. One
+-- row per user; a missing row means "all defaults" (no mode, no
+-- exclusions). The router unions the user's disabledModels with
+-- the operator's global list (data/dashboard-prefs.json) — global
+-- exclusions always apply. routing_mode NULL = inherit the global
+-- mode. Lib: lib/user-prefs.js.
+CREATE TABLE IF NOT EXISTS user_prefs (
+  user_id         TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+  routing_mode    TEXT,                 -- cheap|fast|balanced|quality; NULL = inherit global
+  disabled_models TEXT NOT NULL DEFAULT '[]',  -- JSON array of model ids
+  updated_at      INTEGER NOT NULL      -- epoch ms
+);
+
 -- ============================================================
 -- Billing (Dodo Payments)
 -- ============================================================

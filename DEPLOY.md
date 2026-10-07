@@ -280,6 +280,13 @@ docker builder prune -f          # reclaim build-cache disk after updates
   in `.env` + `docker compose up -d` (recreates the containers with the new
   value). Unowned legacy keys/usage are attached with `db/backfill.js`
   (step 6).
+- **Per-user model/routing prefs**: each account can toggle models and pick a
+  routing mode from the dashboard without the admin token — stored per user in
+  the `user_prefs` table of `data/app.db` (auto-created, no migration), while
+  the operator's global prefs stay in `data/dashboard-prefs.json`. The router
+  unions both exclusion lists and resolves the mode as
+  header → user → global → `cheap`; explicit-model requests bypass prefs
+  entirely. The classifier mode is server-wide and remains operator-only.
 - **More keys**: repeat the step-6 curl with a different name; revoke with
   `curl -X DELETE https://api.example.com/config/api-keys/<id> -H "x-admin-token: …"`
   (ids come from `GET /config/api-keys` with the token).

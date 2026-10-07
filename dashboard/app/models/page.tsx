@@ -73,10 +73,21 @@ export default function ModelsPage() {
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   const models = useMemo(() => cfg?.models ?? [], [cfg]);
+  const isOperator = metrics?.viewer?.role === "operator";
+
+  // Models the operator disabled globally — locked for user accounts
+  // (the backend reports the whole admin list; it's empty for the
+  // operator's own view, whose toggles edit that list directly).
+  const adminDisabled = useMemo(
+    () => new Set(cfg?.adminDisabledModels ?? []),
+    [cfg]
+  );
 
   // Optimistic overrides: apply the click instantly instead of waiting
   // for the next config poll (up to 5s). Pruned once the polled
-  // catalog agrees with them.
+  // catalog agrees with them — or the moment the row becomes
+  // untouchable (provider gone, admin-disabled mid-session), where an
+  // override can never match and would otherwise linger forever.
   const [localEnabled, setLocalEnabled] = useState<Record<string, boolean>>({});
   useEffect(() => {
     setLocalEnabled((prev) => {
@@ -84,7 +95,7 @@ export default function ModelsPage() {
       const next: Record<string, boolean> = {};
       for (const [id, val] of Object.entries(prev)) {
         const model = models.find((m) => m.id === id);
-        if (model && model.enabled === val) {
+        if (model && (model.enabled === val || !model.available || adminDisabled.has(id))) {
           changed = true;
           continue;
         }
@@ -92,7 +103,7 @@ export default function ModelsPage() {
       }
       return changed ? next : prev;
     });
-  }, [models]);
+  }, [models, adminDisabled]);
 
   const enabledOf = (id: string, fallback: boolean) => localEnabled[id] ?? fallback;
   const enabledCount = models.filter((m) => enabledOf(m.id, m.enabled)).length;
@@ -208,6 +219,7 @@ export default function ModelsPage() {
                     const usage = metrics?.byModel.find((x) => x.key === m.id);
                     const busy = pending === m.id;
                     const error = errors[m.id];
+                    const locked = adminDisabled.has(m.id);
                     return (
                       <li
                         key={m.id}
@@ -215,13 +227,16 @@ export default function ModelsPage() {
                       >
                         <label
                           className={`flex items-center gap-3 ${
-                            m.available && !busy ? "cursor-pointer" : "cursor-default opacity-70"
+                            m.available && !busy && !locked
+                              ? "cursor-pointer"
+                              : "cursor-default opacity-70"
                           }`}
                         >
                           <span className="flex min-w-0 flex-1 flex-col gap-1">
                             <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
                               <span className="text-sm font-medium text-ink">{m.id}</span>
                               {!m.available && <Badge tone="warning">no api key</Badge>}
+                              {locked && <Badge tone="neutral">admin off</Badge>}
                               <Badge>{m.profile.costTier} tier</Badge>
                               <Badge>{m.profile.latencyTier} latency</Badge>
                             </span>
@@ -249,7 +264,7 @@ export default function ModelsPage() {
                             className="h-4 w-4 shrink-0"
                             style={{ accentColor: "var(--accent)" }}
                             checked={enabledOf(m.id, m.enabled)}
-                            disabled={!m.available || busy}
+                            disabled={!m.available || busy || locked}
                             onChange={(e) => toggleModel(m.id, e.target.checked)}
                           />
                         </label>
@@ -265,11 +280,24 @@ export default function ModelsPage() {
 
       <Panel title="How selection works" note="routing only">
         <p className="max-w-3xl text-[13px] leading-relaxed text-ink-2">
-          Unchecked models drop out of the router candidate pool, so auto-routed requests never
-          land on them. The selection is stored in data/dashboard-prefs.json and survives
-          restarts. If a request needs a capability only an unchecked model has (or you uncheck
-          every eligible model), the router ignores the exclusion rather than fail the request.
-          Requests that name a model explicitly always go through.
+          {isOperator ? (
+            <>
+              Unchecked models drop out of the router candidate pool, so auto-routed requests
+              never land on them. The selection is stored in data/dashboard-prefs.json and
+              survives restarts. If a request needs a capability only an unchecked model has (or
+              you uncheck every eligible model), the router ignores the exclusion rather than
+              fail the request. Requests that name a model explicitly always go through.
+            </>
+          ) : (
+            <>
+              Unchecked models drop out of the router candidate pool, so auto-routed requests
+              never land on them. Your selection is saved to your account and survives restarts;
+              models the operator has disabled always stay out. If a request needs a capability
+              only an unchecked model has (or you uncheck every eligible model), the router
+              ignores the exclusion rather than fail the request. Requests that name a model
+              explicitly always go through.
+            </>
+          )}
         </p>
       </Panel>
         </>

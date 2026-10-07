@@ -180,6 +180,9 @@ export type BenchmarkReport = {
 export type DashboardConfig = {
   models: ModelCatalogEntry[];
   prefs: { routingMode: string | null; disabledModels: string[] };
+  // Models the operator disabled globally; locked for user accounts.
+  // Optional: absent from older backends.
+  adminDisabledModels?: string[];
   routingModes: string[];
   classifier: { mode: string; modes: string[] };
   policy: { version?: number; generatedAt?: string; rules: unknown[] } | null;

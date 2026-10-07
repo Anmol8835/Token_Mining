@@ -13,6 +13,7 @@ const { toPublicShape } = require("./lib/classifier/taxonomy");
 const { getLastUserMessage, extractSystemText } = require("./lib/classifier/text-utils");
 const metrics = require("./lib/metrics");
 const prefs = require("./lib/prefs");
+const userPrefs = require("./lib/user-prefs");
 const apiKeys = require("./lib/api-keys");
 const plans = require("./lib/plans");
 const webhooks = require("./lib/webhooks");
@@ -760,19 +761,35 @@ app.post("/v1/messages", requireApiKey, requireActivePlan, async (req, res) => {
       classification = await classifier.classify(classBody);
       classifierMs = Date.now() - classStart;
 
-      // Parse routing mode from header (cost-reduction aware)
-      // X-Routing-Mode: cheap | fast | balanced | quality
-      // Header wins; otherwise the dashboard-configured default.
+      // Routing mode resolution (auto-routing only):
+      //   X-Routing-Mode header -> the caller's own saved mode ->
+      //   the operator's global default -> "cheap".
+      // The header always wins; a key without a user (bootstrap)
+      // gets global prefs only.
+      const userPrefRow = req.apiKey?.userId ? userPrefs.get(req.apiKey.userId) : null;
       const routingMode = (
-        req.headers["x-routing-mode"] || prefs.getRoutingMode() || "cheap"
+        req.headers["x-routing-mode"] ||
+        userPrefRow?.routingMode ||
+        prefs.getRoutingMode() ||
+        "cheap"
       ).toLowerCase();
       const validModes = ["cheap", "fast", "balanced", "quality"];
       const effectiveMode = validModes.includes(routingMode) ? routingMode : "cheap";
 
+      // Exclusions: the operator's global list always applies; the
+      // user's own list unions on top. Explicit model requests
+      // (handled above) bypass both.
+      const excludedIds = prefs.getDisabledModels();
+      if (userPrefRow) {
+        for (const id of userPrefRow.disabledModels) {
+          if (!excludedIds.includes(id)) excludedIds.push(id);
+        }
+      }
+
       try {
         routeResult = selectModel(
           classification, registry, serverConfig.router, null,
-          effectiveMode, prefs.getDisabledModels(), req.plan?.allowedTiers ?? null
+          effectiveMode, excludedIds, req.plan?.allowedTiers ?? null
         );
       } catch (err) {
         // Plan tiers emptied the candidate pool — a plan denial,
@@ -790,6 +807,9 @@ app.post("/v1/messages", requireApiKey, requireActivePlan, async (req, res) => {
         throw err;
       }
       selectedModel = routeResult.model;
+      console.log(
+        `  → routed: ${selectedModel.id} (mode=${effectiveMode}, ${routeResult.reason || "no reason"})`
+      );
 
       // Definitive post-check — covers every router escape hatch
       // (widen blocks, policy filter, fallback branches).
@@ -1276,7 +1296,7 @@ app.post("/metrics/demo", requireOperator, async (req, res) => {
 // Consumed by the Next.js dashboard; prefs persist in data/.
 // ============================================================
 
-function dashboardCatalog() {
+function dashboardCatalog(actor) {
   // Static display data: router policy + benchmark report (may not exist).
   let policy = null;
   let benchmark = null;
@@ -1294,6 +1314,14 @@ function dashboardCatalog() {
     );
   } catch (_) {}
 
+  // Scoped users see THEIR selection on top of the operator's global
+  // one: a model reads enabled only if the operator hasn't disabled
+  // it AND the user hasn't. Operators (and any caller without an
+  // actor) get the global view, byte-identical to before.
+  const user = actor?.role === "user" ? actor.user : null;
+  const globalDisabled = prefs.getDisabledModels();
+  const userRow = user ? userPrefs.get(user.id) : null;
+
   // All configured models, with provider availability. Unavailable
   // providers (missing API key) can't serve traffic, so they read as
   // disabled in the UI even though they aren't in the prefs file.
@@ -1305,15 +1333,27 @@ function dashboardCatalog() {
     capabilities: m.capabilities,
     profile: m.profile,
     available: !!registry.getProvider(m.id),
-    enabled: !!registry.getProvider(m.id) && prefs.isModelEnabled(m.id),
+    enabled:
+      !!registry.getProvider(m.id) &&
+      prefs.isModelEnabled(m.id) &&
+      !(userRow ? userRow.disabledModels.includes(m.id) : false),
   }));
 
   return {
     models,
     prefs: {
-      routingMode: prefs.getRoutingMode(),
-      disabledModels: prefs.getDisabledModels(),
+      // Effective mode for users (their own, else inherited global)
+      // so the routing page highlights what auto-routing will use;
+      // null only when nothing is saved anywhere.
+      routingMode: user
+        ? userRow.routingMode ?? prefs.getRoutingMode()
+        : prefs.getRoutingMode(),
+      disabledModels: user ? userRow.disabledModels : globalDisabled,
     },
+    // Models the operator locked globally. Always empty for the
+    // operator's own view (their toggles edit that very list); for
+    // users it drives the locked "admin off" rows in the UI.
+    adminDisabledModels: user ? globalDisabled : [],
     routingModes: prefs.VALID_MODES,
     classifier: {
       mode: serverConfig.classifier?.mode || "auto",
@@ -1325,11 +1365,13 @@ function dashboardCatalog() {
 }
 
 app.get("/config/dashboard", (req, res) => {
-  res.json(dashboardCatalog());
+  res.json(dashboardCatalog(req.actor));
 });
 
 // Toggle a model in/out of the auto-routing candidate pool.
-app.post("/config/models", requireOperator, (req, res) => {
+// Operators edit the global list; signed-in users edit their own
+// (union semantics — the global list always still applies).
+app.post("/config/models", (req, res) => {
   const { id, enabled } = req.body || {};
   if (typeof id !== "string" || typeof enabled !== "boolean") {
     return res
@@ -1342,17 +1384,33 @@ app.post("/config/models", requireOperator, (req, res) => {
   const availableIds = registry
     .getAllModels()
     .map((m) => m.id);
-  const result = prefs.setModelEnabled(id, enabled, availableIds);
+  const globalDisabled = prefs.getDisabledModels();
+  const result =
+    req.actor?.role === "operator"
+      ? prefs.setModelEnabled(id, enabled, availableIds)
+      : userPrefs.setModelEnabled(
+          req.actor.user.id,
+          id,
+          enabled,
+          // Models the operator disabled are not part of this user's
+          // pool, so they don't count toward "the last one".
+          availableIds.filter((mid) => !globalDisabled.includes(mid))
+        );
   if (!result.ok) {
     return res.status(400).json(result);
   }
-  res.json({ ok: true, catalog: dashboardCatalog() });
+  res.json({ ok: true, catalog: dashboardCatalog(req.actor) });
 });
 
 // Set the default routing mode (cheap | fast | balanced | quality).
-app.post("/config/routing", requireOperator, (req, res) => {
+// Operators set the global default; users set their own, which wins
+// over the global one (but not over an X-Routing-Mode header).
+app.post("/config/routing", (req, res) => {
   const { mode } = req.body || {};
-  const updated = prefs.setRoutingMode(mode);
+  const updated =
+    req.actor?.role === "operator"
+      ? prefs.setRoutingMode(mode)
+      : userPrefs.setRoutingMode(req.actor.user.id, mode);
   if (updated === null) {
     return res.status(400).json({
       ok: false,
