@@ -13,10 +13,10 @@ import { StatTile } from "@/app/components/stat-tile";
 const POLL_MS = 4000;
 
 /**
- * Billing — plan state for the signed-in account. The page is a
- * read-model of what the webhook handler wrote to SQLite
- * (/api/billing/state); Subscribe hands off to a Dodo checkout and
- * the 4s poll flips the page to active once Dodo's webhook lands
+ * Billing — prepaid credit for the signed-in account. The page is
+ * a read-model of users.balance_usd (webhook credits, metrics
+ * debits); Add credit hands off to a Dodo one-time checkout and
+ * the 4s poll flips the balance once the payment webhook lands
  * (the redirect-before-webhook race — fulfillment is never taken
  * from the redirect itself).
  */
@@ -27,32 +27,34 @@ export default function BillingPage() {
   // return/cancel URLs.
   const returnStatus = useSearchParams().get("status");
 
-  const [busy, setBusy] = useState(false);
+  const [busy, setBusy] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
 
-  async function subscribe() {
+  async function addCredit(topupId: string) {
     if (busy || !data) return;
-    setBusy(true);
+    setBusy(topupId);
     setActionError(null);
     try {
-      const res = await postCheckout(data.plan?.id);
-      window.location.href = res.checkoutUrl;
+      const res = await postCheckout(topupId);
+      // External redirect (Dodo hosted checkout) — not router.push.
+      window.location.assign(res.checkoutUrl);
     } catch (err) {
       setActionError(err instanceof Error ? err.message : "Checkout failed");
-      setBusy(false);
+      setBusy(null);
     }
   }
 
   async function manageBilling() {
     if (busy) return;
-    setBusy(true);
+    setBusy("portal");
     setActionError(null);
     try {
       const res = await getPortalUrl();
-      window.location.href = res.url;
+      // External redirect (Dodo customer portal) — not router.push.
+      window.location.assign(res.url);
     } catch (err) {
       setActionError(err instanceof Error ? err.message : "Could not open the portal");
-      setBusy(false);
+      setBusy(null);
     }
   }
 
@@ -60,7 +62,7 @@ export default function BillingPage() {
     return (
       <div className="flex max-w-3xl flex-col gap-6">
         <h1 className="text-xl font-semibold tracking-tight text-ink">Billing</h1>
-        <Panel title="Plan">
+        <Panel title="Balance">
           <div className="flex flex-col gap-2">
             <Skeleton className="h-9 w-full" />
             <Skeleton className="h-9 w-2/3" />
@@ -70,39 +72,33 @@ export default function BillingPage() {
     );
   }
 
-  const { plan, usage, subscription, effective } = data;
-  const cancelling = effective && subscription?.status === "cancelled";
-  const usedPct =
-    usage.unlimited || usage.quotaUsd <= 0
-      ? 0
-      : Math.min(100, (usage.usedUsd / usage.quotaUsd) * 100);
   const fmtDate = (ms: number | null | undefined) =>
     ms ? fmtDateTime(new Date(ms).toISOString()) : "-";
+  const configured = data.topups.filter((t) => t.configured);
 
   return (
     <div className="flex max-w-3xl flex-col gap-6">
       <div>
         <h1 className="text-xl font-semibold tracking-tight text-ink">Billing</h1>
         <p className="mt-0.5 text-[13px] text-ink-3">
-          {effective
-            ? `${plan?.name ?? data.planId} plan · renews ${fmtDate(data.planExpiry)}`
-            : "No active subscription — the API is blocked until you subscribe."}
+          Prepaid credit — pay as you go. The API keeps working up to{" "}
+          {fmtUsd(data.graceUsd)} below zero.
         </p>
       </div>
 
       {returnStatus === "cancelled" && (
         <Banner tone="warn" title="Checkout cancelled">
-          You haven&apos;t been charged. You can subscribe whenever you&apos;re ready.
+          You haven&apos;t been charged. You can add credit whenever you&apos;re ready.
         </Banner>
       )}
       {returnStatus === "processing" &&
-        (effective ? (
-          <Banner tone="good" title="Subscription active">
-            Your plan is live — the API is unlocked.
+        (data.balanceUsd > 0 ? (
+          <Banner tone="good" title="Credit added">
+            Your balance is up to date — the API is unlocked.
           </Banner>
         ) : (
           <Banner tone="info" title="Finishing up…">
-            Payment received. Your plan activates as soon as the payment provider confirms it —
+            Payment received. Your credit appears as soon as the payment provider confirms it —
             this page updates automatically.
           </Banner>
         ))}
@@ -113,128 +109,91 @@ export default function BillingPage() {
         </Banner>
       )}
 
-      {!effective && (
-        <Panel title="Subscribe" note={plan ? `${fmtUsd(plan.priceUsd)} / month` : undefined}>
-          {plan ? (
-            <div className="flex flex-col gap-4">
-              <ul className="flex flex-col gap-1.5 text-[13px] text-ink-2">
-                <li className="flex items-center gap-2">
-                  <CheckCircle size={15} weight="bold" className="shrink-0 text-good" />
-                  {plan.name} plan — every {plan.tiers.includes("pro") ? "model" : "cheap-tier model"}{" "}
-                  via the API
-                </li>
-                <li className="flex items-center gap-2">
-                  <CheckCircle size={15} weight="bold" className="shrink-0 text-good" />
-                  {usage.quotaUsd > 0
-                    ? `${fmtUsd(usage.quotaUsd)} of usage included each month`
-                    : "Unlimited monthly usage"}
-                </li>
-                <li className="flex items-center gap-2">
-                  <CheckCircle size={15} weight="bold" className="shrink-0 text-good" />
-                  Cancel anytime — access runs to the end of the paid period
-                </li>
-              </ul>
-              {plan.tiers.length === 1 && (
-                <p className="text-xs text-ink-3">
-                  This plan is limited to {plan.tiers.join(", ")}-tier models.
-                </p>
-              )}
-              {data.checkoutConfigured ? (
-                <div>
-                  <Button variant="primary" pending={busy} onClick={subscribe}>
-                    <CreditCard size={15} weight="bold" />
-                    Subscribe — {fmtUsd(plan.priceUsd)}/mo
-                  </Button>
-                </div>
-              ) : (
-                <p className="flex items-start gap-1.5 rounded-lg bg-warning/10 px-2.5 py-1.5 text-xs text-warning">
-                  <WarningCircle size={13} weight="bold" className="mt-0.5 shrink-0" />
-                  Billing isn&apos;t configured yet — the operator still needs to paste the Dodo
-                  product id into config/plans.json.
-                </p>
-              )}
-              {actionError && (
-                <p className="flex items-start gap-1.5 rounded-lg bg-critical/10 px-2.5 py-1.5 text-xs text-critical">
-                  <WarningCircle size={13} weight="bold" className="mt-0.5 shrink-0" />
-                  {actionError}
-                </p>
-              )}
-            </div>
-          ) : (
-            <EmptyState
-              title="No plan available"
-              body="The plan catalog is empty — the operator needs to configure config/plans.json."
-            />
-          )}
-        </Panel>
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+        <StatTile
+          label="Balance"
+          value={fmtUsd(data.balanceUsd)}
+          sub={`blocks at -${fmtUsd(data.graceUsd)}`}
+        />
+        <StatTile
+          label="Last top-up"
+          value={data.lastTopup ? fmtUsd(data.lastTopup.amountUsd) : "—"}
+          sub={data.lastTopup ? fmtDate(data.lastTopup.at) : "no top-ups yet"}
+        />
+        <StatTile
+          label="Account"
+          value={data.status}
+          sub={data.status === "pending" ? "activates with your first top-up" : undefined}
+        />
+      </div>
+
+      {data.balanceUsd < 0 && data.status === "active" && (
+        <Banner tone="warn" title="Using the grace window">
+          Your balance is negative. The API blocks once it reaches -{fmtUsd(data.graceUsd)} — add
+          credit to keep requests flowing.
+        </Banner>
       )}
 
-      {effective && (
-        <>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-            <StatTile
-              label="Plan"
-              value={plan?.name ?? data.planId}
-              sub={cancelling ? "cancelling" : "active"}
-            />
-            <StatTile
-              label={cancelling ? "Access until" : "Renews"}
-              value={fmtDate(data.planExpiry)}
-              sub={cancelling ? "then the API blocks" : "auto-renews via Dodo"}
-            />
-            <StatTile
-              label="This month"
-              value={usage.unlimited ? "Unlimited" : fmtUsd(usage.usedUsd)}
-              sub={
-                usage.unlimited
-                  ? `since ${usage.monthStart}`
-                  : `of ${fmtUsd(usage.quotaUsd)} · resets the 1st`
-              }
-            />
-          </div>
-
-          {!usage.unlimited && usage.quotaUsd > 0 && (
-            <Panel title="Monthly usage" note={`${usedPct.toFixed(1)}% of quota`}>
-              <div className="h-2 w-full overflow-hidden rounded-full bg-surface-2">
-                <div
-                  className={`h-full rounded-full ${usedPct >= 90 ? "bg-critical" : usedPct >= 70 ? "bg-warning" : "bg-accent"}`}
-                  style={{ width: `${usedPct}%` }}
-                />
-              </div>
-              <p className="mt-2 text-xs text-ink-3">
-                {fmtUsd(usage.usedUsd)} of {fmtUsd(usage.quotaUsd)} used since {usage.monthStart} (UTC).
-                Requests are blocked once the quota is reached.
-              </p>
-            </Panel>
-          )}
-
-          {cancelling && (
-            <Banner tone="warn" title="Subscription cancelled">
-              Your plan stays active until {fmtDate(data.planExpiry)}. After that the API blocks
-              until you resubscribe.
-            </Banner>
-          )}
-
-          <Panel title="Manage" note="payments, invoices, cancellation">
-            <div className="flex flex-col gap-3">
-              <div>
-                <Button variant="ghost" pending={busy} onClick={manageBilling}>
-                  Manage billing
+      <Panel title="Add credit" note="one-time payment">
+        {configured.length > 0 ? (
+          <div className="flex flex-col gap-4">
+            <div className="flex flex-wrap items-center gap-2">
+              {configured.map((t) => (
+                <Button
+                  key={t.id}
+                  variant="primary"
+                  pending={busy === t.id}
+                  disabled={busy !== null && busy !== t.id}
+                  onClick={() => addCredit(t.id)}
+                >
+                  <CreditCard size={15} weight="bold" />
+                  Add {t.name}
                 </Button>
-              </div>
-              {actionError && (
-                <p className="flex items-start gap-1.5 rounded-lg bg-critical/10 px-2.5 py-1.5 text-xs text-critical">
-                  <WarningCircle size={13} weight="bold" className="mt-0.5 shrink-0" />
-                  {actionError}
-                </p>
-              )}
-              <p className="text-xs text-ink-3">
-                Opens the payment provider&apos;s secure portal in a new page.
-              </p>
+              ))}
             </div>
-          </Panel>
-        </>
-      )}
+            <p className="text-[13px] leading-relaxed text-ink-2">
+              Credit never expires. Usage is deducted per request — cheap-tier models stretch it
+              much further than pro-tier ones, and auto-routing always picks the cheapest model
+              that can do the job.
+            </p>
+            {actionError && (
+              <p className="flex items-start gap-1.5 rounded-lg bg-critical/10 px-2.5 py-1.5 text-xs text-critical">
+                <WarningCircle size={13} weight="bold" className="mt-0.5 shrink-0" />
+                {actionError}
+              </p>
+            )}
+          </div>
+        ) : (
+          <EmptyState
+            title="Top-ups not configured"
+            body={
+              data.topups.length > 0
+                ? "The operator still needs to paste the Dodo product ids into config/plans.json."
+                : "The top-up catalog is empty — the operator needs to configure config/plans.json."
+            }
+          />
+        )}
+      </Panel>
+
+      <Panel title="Manage" note="payment history, invoices">
+        <div className="flex flex-col gap-3">
+          <div>
+            <Button variant="ghost" pending={busy === "portal"} onClick={manageBilling}>
+              Manage billing
+            </Button>
+          </div>
+          {configured.length === 0 && actionError && (
+            <p className="flex items-start gap-1.5 rounded-lg bg-critical/10 px-2.5 py-1.5 text-xs text-critical">
+              <WarningCircle size={13} weight="bold" className="mt-0.5 shrink-0" />
+              {actionError}
+            </p>
+          )}
+          <p className="text-xs text-ink-3">
+            Opens the payment provider&apos;s secure portal in a new page — available after your
+            first top-up.
+          </p>
+        </div>
+      </Panel>
 
       {stale && (
         <p className="text-xs text-ink-3">

@@ -10,9 +10,10 @@
 -- ============================================================
 
 -- Accounts. Created via db/create-user.js (operator) or open
--- signup in the dashboard (status starts 'pending'). The plan
--- columns are denormalized from the subscriptions table by the
--- proxy's webhook handler.
+-- signup in the dashboard (status starts 'pending'; the first
+-- top-up payment flips it to 'active'). balance_usd is prepaid
+-- credit (webhook credits, metrics debits). plan/plan_expiry are
+-- legacy subscription columns, dormant.
 CREATE TABLE IF NOT EXISTS users (
   id            TEXT PRIMARY KEY,
   email         TEXT UNIQUE NOT NULL,
@@ -20,8 +21,10 @@ CREATE TABLE IF NOT EXISTS users (
   name          TEXT,
   created_at    INTEGER NOT NULL,       -- epoch ms
   status        TEXT NOT NULL DEFAULT 'active',  -- 'active' | 'pending' | 'suspended'
-  plan          TEXT NOT NULL DEFAULT 'none',    -- plan id from config/plans.json
-  plan_expiry   INTEGER                          -- epoch ms; NULL = no active period
+  plan          TEXT NOT NULL DEFAULT 'none',    -- legacy; unused
+  plan_expiry   INTEGER,                         -- legacy; unused
+  balance_usd   REAL NOT NULL DEFAULT 0,         -- prepaid credit; negative = overage into the $1 grace
+  dodo_customer_id TEXT                          -- Dodo customer id (for the billing portal)
 );
 
 -- Opaque login sessions. The cookie holds the raw 32-byte token;
@@ -60,6 +63,7 @@ CREATE TABLE IF NOT EXISTS usage_daily (
   cache_write_tokens  INTEGER NOT NULL DEFAULT 0,
   cost_usd            REAL NOT NULL DEFAULT 0,
   classifier_cost_usd REAL NOT NULL DEFAULT 0,
+  compaction_cost_usd REAL NOT NULL DEFAULT 0,
   baseline_cost_usd   REAL NOT NULL DEFAULT 0,
   PRIMARY KEY (user_id, day)
 );

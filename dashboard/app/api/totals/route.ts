@@ -18,6 +18,7 @@ type DailyRow = {
   requests: number;
   cost_usd: number;
   classifier_cost_usd: number;
+  compaction_cost_usd: number;
   baseline_cost_usd: number;
 };
 
@@ -38,12 +39,14 @@ export async function GET() {
          COALESCE(SUM(cache_write_tokens), 0)  AS cacheWriteTokens,
          COALESCE(SUM(cost_usd), 0)            AS costUsd,
          COALESCE(SUM(classifier_cost_usd), 0) AS classifierCostUsd,
+         COALESCE(SUM(compaction_cost_usd), 0) AS compactionCostUsd,
          COALESCE(SUM(baseline_cost_usd), 0)   AS baselineCostUsd
        FROM usage_daily WHERE user_id = ?`
     )
     .get(user.id) as Record<string, number>;
 
-  const actualCostUsd = totals.costUsd + totals.classifierCostUsd;
+  const actualCostUsd =
+    totals.costUsd + totals.classifierCostUsd + totals.compactionCostUsd;
   const savedUsd = totals.baselineCostUsd - actualCostUsd;
 
   // Last 30 days, gaps filled with zeros so the chart axis is clean.
@@ -52,7 +55,7 @@ export async function GET() {
     .slice(0, 10);
   const rows = getDb()
     .prepare(
-      `SELECT day, requests, cost_usd, classifier_cost_usd, baseline_cost_usd
+      `SELECT day, requests, cost_usd, classifier_cost_usd, compaction_cost_usd, baseline_cost_usd
        FROM usage_daily
        WHERE user_id = ? AND day >= ?
        ORDER BY day ASC`
@@ -69,7 +72,7 @@ export async function GET() {
   for (let i = SERIES_DAYS - 1; i >= 0; i--) {
     const day = new Date(Date.now() - i * DAY_MS).toISOString().slice(0, 10);
     const r = byDay.get(day);
-    const cost = r ? r.cost_usd + r.classifier_cost_usd : 0;
+    const cost = r ? r.cost_usd + r.classifier_cost_usd + r.compaction_cost_usd : 0;
     daily.push({
       day,
       requests: r?.requests ?? 0,
@@ -89,6 +92,7 @@ export async function GET() {
       cacheWriteTokens: totals.cacheWriteTokens,
       costUsd: totals.costUsd,
       classifierCostUsd: totals.classifierCostUsd,
+      compactionCostUsd: totals.compactionCostUsd,
       baselineCostUsd: totals.baselineCostUsd,
       actualCostUsd,
       savedUsd,

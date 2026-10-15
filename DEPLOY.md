@@ -158,17 +158,16 @@ token is injected for anyone (fail closed). `/health` stays public
 (healthchecks + model ids only).
 
 **Open signup**: anyone can create an account at `https://<DOMAIN>/signup`
-(status `pending`, no plan). `db/create-user.js` remains for
+(status `pending`, zero balance). `db/create-user.js` remains for
 operator-created `active` accounts and password resets — but once
-enforcement is on (step 10), an `active` account with `plan='none'` is
-still blocked at the API: **subscribe your own account too**, or grant
-a plan manually:
+enforcement is on (step 10), a zero-balance account is still blocked at
+the API: **top up your own account too**, or grant credit manually:
 
 ```sh
 docker compose exec -T llm-proxy node -e "
   const db = require('./lib/db');
-  db.prepare(\"UPDATE users SET status='active', plan='monthly', plan_expiry=? WHERE email=?\")
-    .run(Date.now() + 30*24*3600*1000, 'you@example.com');"
+  db.prepare(\"UPDATE users SET status='active', balance_usd = balance_usd + 10 WHERE email = ?\")
+    .run('you@example.com');"
 ```
 
 ## 6. Create the first API key — do this immediately
@@ -225,8 +224,8 @@ curl -s -o /dev/null -w '%{http_code}\n' -X POST https://api.example.com/v1/mess
   -H "Content-Type: application/json" \
   -d '{"model":"deepseek-flash","max_tokens":8,"messages":[{"role":"user","content":"hi"}]}'
 
-# with key -> 200 (once PLAN_ENFORCEMENT=1 the key's account also needs an
-# active subscription — otherwise 402; see step 10)
+# with key -> 200 (once PLAN_ENFORCEMENT=1 the key's account also needs
+# credit — balance above -$1.00, otherwise 402; see step 10)
 curl -s -o /dev/null -w '%{http_code}\n' -X POST https://api.example.com/v1/messages \
   -H "Authorization: Bearer sk-relay-..." \
   -H "Content-Type: application/json" \
@@ -291,64 +290,72 @@ docker builder prune -f          # reclaim build-cache disk after updates
   `curl -X DELETE https://api.example.com/config/api-keys/<id> -H "x-admin-token: …"`
   (ids come from `GET /config/api-keys` with the token).
 
-## 10. Billing rollout (Dodo Payments)
+## 10. Billing rollout (Dodo prepaid top-ups)
 
-Deploy the billing code with `PLAN_ENFORCEMENT` **unset** (default off —
-every key keeps full access). Enforce only after the flow below is verified
-in test mode.
+Billing is **prepaid credit**, not subscriptions: users buy one-time
+top-ups ($5/$10/$20 presets), the balance is debited per request, and the
+API blocks once the balance reaches -$1.00 (grace). Deploy the billing
+code with `PLAN_ENFORCEMENT` **unset** (default off — every key keeps full
+access). Enforce only after the flow below is verified in test mode.
 
-1. **Create the product** in the [Dodo dashboard](https://app.dodopayments.com)
-   in *test mode*: a **subscription** product, monthly, price ≥ $1. Copy its
-   id (`pdt_…`).
-2. **Paste it into the plan catalog** — both copies, per environment
+1. **Create the products** in the [Dodo dashboard](https://app.dodopayments.com)
+   in *test mode*: three **one-time payment** products (NOT subscription),
+   prices **5 / 10 / 20 dollars** (Dodo takes cents — enter 500/1000/2000).
+   Copy their ids (`pdt_…`).
+2. **Paste them into the top-up catalog** — both copies, per environment
 
    ```
-   config/plans.json          products.test_mode / products.live_mode
-   dashboard/lib/plans.json   (mirror — keep byte-identical plans array)
+   config/plans.json          topups[].products.test_mode / products.live_mode
+   dashboard/lib/plans.json   (mirror — keep the topups array in sync)
    ```
 
-   Adjust `priceUsd` / `monthlyQuotaUsd` / `tiers` if you like
-   (`tiers: ["cheap"]` limits the plan to cheap-tier models; `tiers:
-   ["cheap","pro"]` = all models). `monthlyQuotaUsd: 0` = unlimited.
+   `amountUsd` is the display amount (the credit itself is the pre-tax
+   amount Dodo reports: total_amount minus tax — keep the two aligned).
+   Adjust the presets and names freely — the shape is one entry per Dodo
+   product.
 3. **Add the webhook endpoint** in Dodo: `https://<DOMAIN>/webhooks/dodo`,
-   subscribed to `subscription.*` (at least `active`, `renewed`,
-   `cancelled`, `expired`, `failed`). Copy the signing secret into
+   subscribed to **`payment.*`** (at least `succeeded`; add `failed`,
+   `processing`, `cancelled` for visibility). Copy the signing secret into
    `DODO_PAYMENTS_WEBHOOK_KEY`. Caddy routes `/webhooks*` to the proxy
    (committed Caddyfile) — after re-rsync run `docker compose restart caddy`,
    then `docker compose up -d --build` so the proxy + dashboard pick up the
    new plans.json copies.
 4. **Test end-to-end (test mode)**: set `DODO_PAYMENTS_ENVIRONMENT=test_mode`
    + test API key, restart both containers. Sign up at `/signup`, hit
-   `/billing`, Subscribe, pay with a Dodo test card. Within a few seconds the
-   billing page flips to active. Verify the webhook side:
+   `/billing`, **Add credit**, pay with a Dodo test card. Within a few seconds
+   the balance updates (the account flips to `active` on the first payment).
+   Verify the webhook side:
 
    ```sh
    docker compose exec -T llm-proxy node -e "
      console.table(require('./lib/db').prepare(
        'SELECT webhook_id,type,user_id,processed,error FROM payment_events ORDER BY created_at DESC LIMIT 10').all());"
    ```
-5. **Go live**: create the live product + live API key, paste the live
-   product id, set `DODO_PAYMENTS_ENVIRONMENT=live_mode`, `docker compose up
-   -d`. Log in and **subscribe your own account** through the real checkout
+5. **Go live**: create the live products + live API key, paste the live
+   product ids, set `DODO_PAYMENTS_ENVIRONMENT=live_mode`, `docker compose up
+   -d`. Log in and **top up your own account** through the real checkout
    (or use the SQL grant in step 5b).
 6. **Flip enforcement**: `PLAN_ENFORCEMENT=1` in `.env`, then `docker compose
    up -d` (llm-proxy restarts). Verify:
 
    ```sh
-   # unsubscribed key -> 402 no_active_subscription
+   # zero-balance key -> 402 insufficient_balance (or account_inactive for pending)
    curl -s -o /dev/null -w '%{http_code}\n' -X POST https://api.example.com/v1/messages \
-     -H "Authorization: Bearer sk-relay-unsubscribed..." -H "Content-Type: application/json" \
+     -H "Authorization: Bearer sk-relay-unfunded..." -H "Content-Type: application/json" \
      -d '{"model":"deepseek-flash","max_tokens":8,"messages":[{"role":"user","content":"hi"}]}'
 
-   # subscribed key + cheap model -> 200; claude-opus-4-8 on a cheap-only plan -> 403 model_tier_denied
+   # funded key -> 200. Balance is debited ~30s after traffic (the metrics
+   # flush window) by provider + classifier + compaction spend of every
+   # served request (auto-routed OR explicit model); the gate blocks at
+   # balance <= -$1.00.
    # webhook without a valid signature -> 401 (no retry); with one -> 200
    ```
 
    **Rollback**: unset `PLAN_ENFORCEMENT`, `docker compose up -d` — every key
    immediately gets full access again (no data changes needed).
 7. **Reconciliation**: events whose user couldn't be matched are stored
-   `processed=0` for manual fixing (the payload has the Dodo customer email /
-   subscription id):
+   `processed=0` for manual fixing (the payload has `metadata.user_id`, the
+   checkout session id, and the Dodo customer email):
 
    ```sh
    docker compose exec -T llm-proxy node -e "
@@ -356,9 +363,12 @@ in test mode.
        \"SELECT webhook_id,type,error FROM payment_events WHERE processed=0\").all());"
    ```
 
-   Match the user by hand, then fix `subscriptions`/`users` with the same
-   values the handler would have written (`plan`, `plan_expiry`,
-   `status='active'`) and mark the event processed.
+   Match the user by hand, then apply what the handler would have written:
+   `UPDATE users SET balance_usd = balance_usd + <amount>, status='active'
+   WHERE id = '<user>'` and mark the event processed.
+8. **Refunds** (out of scope in code): refunding in the Dodo dashboard does
+   not decrement `users.balance_usd` — do it manually with the same UPDATE
+   in reverse, and consider whether the user already spent the credit.
 
 ## 11. Marketing-site SSO (steerosai.com)
 
@@ -448,8 +458,8 @@ curl -si "https://app.steerosai.com/auth/google/callback?code=garbage&state=x" \
 ### Hand-test checklist
 
 - Existing Google account → lands on the dashboard signed in.
-- Brand-new Google account → `/billing`; DB row is `pending`/`none` with a
-  bcrypt hash (email/password login with any password → 401).
+- Brand-new Google account → `/billing`; DB row is `pending` with zero
+  balance and a bcrypt hash (email/password login with any password → 401).
 - Suspended user → `/login?error=suspended`, no session.
 - Start at `https://www.steerosai.com/login` → same dance; the cookie
   covers site + dashboard (log out from either side clears both).

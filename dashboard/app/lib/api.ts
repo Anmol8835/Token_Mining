@@ -216,6 +216,7 @@ export type TotalsSnapshot = {
     cacheWriteTokens: number;
     costUsd: number;
     classifierCostUsd: number;
+    compactionCostUsd: number;
     baselineCostUsd: number;
     actualCostUsd: number;
     savedUsd: number;
@@ -258,19 +259,11 @@ export type AuthUser = { id: string; email: string; name: string | null };
 export type BillingState = {
   ok: true;
   status: "active" | "pending" | "suspended";
-  planId: string;
-  planExpiry: number | null;
-  effective: boolean;
-  plan: {
-    id: string;
-    name: string;
-    priceUsd: number;
-    monthlyQuotaUsd: number;
-    tiers: string[];
-  } | null;
-  subscription: { id: string; status: string; currentPeriodEnd: number | null } | null;
-  usage: { monthStart: string; usedUsd: number; quotaUsd: number; unlimited: boolean };
+  balanceUsd: number;
+  graceUsd: number;
+  topups: { id: string; name: string; amountUsd: number; configured: boolean }[];
   checkoutConfigured: boolean;
+  lastTopup: { amountUsd: number; at: number } | null;
 };
 
 export const getMetrics = () => fetchJson<MetricsSnapshot>("/api/server/metrics");
@@ -280,9 +273,9 @@ export const getHealth = () =>
 export const getApiKeys = () => fetchJson<ApiKeyList>("/api/server/config/api-keys");
 export const getTotals = () => fetchJson<TotalsSnapshot>("/api/totals");
 export const getBillingState = () => fetchJson<BillingState>("/api/billing/state");
-export const postCheckout = (planId?: string) =>
+export const postCheckout = (topupId?: string) =>
   postJson<{ ok: true; checkoutUrl: string; sessionId: string }>("/api/billing/checkout", {
-    planId,
+    topupId,
   });
 export const getPortalUrl = () => fetchJson<{ ok: true; url: string }>("/api/billing/portal");
 export const getMe = () => fetchJson<{ ok: true; user: AuthUser }>("/api/auth/me");

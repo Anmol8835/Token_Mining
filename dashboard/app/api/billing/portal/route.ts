@@ -5,11 +5,13 @@ import { getSessionUser, SESSION_COOKIE } from "@/lib/auth";
 import { dashboardBaseUrl, getDodo } from "@/lib/dodo";
 
 // ============================================================
-// Dodo customer portal link (cancel, change payment method,
-// invoices). Dodo's portal does NOT authenticate the visitor —
-// anyone with the link sees that customer's billing — so it must
-// only ever be minted for the customer id on the signed-in
-// user's OWN subscription row, never from a client-supplied id.
+// Dodo customer portal link (payment history, invoices). Dodo's
+// portal does NOT authenticate the visitor — anyone with the link
+// sees that customer's billing — so it must only ever be minted
+// for the customer id on the signed-in user's OWN row, never
+// from a client-supplied id. The id lands on users.dodo_customer_id
+// with the first top-up; the subscriptions fallback covers
+// accounts that got one before top-ups existed.
 // ============================================================
 
 export async function GET() {
@@ -19,22 +21,30 @@ export async function GET() {
     return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
   }
 
-  const sub = getDb()
-    .prepare(
-      `SELECT dodo_customer_id FROM subscriptions
-       WHERE user_id = ? AND dodo_customer_id IS NOT NULL
-       ORDER BY updated_at DESC LIMIT 1`
-    )
-    .get(sessionUser.id) as { dodo_customer_id: string } | undefined;
-  if (!sub?.dodo_customer_id) {
+  const db = getDb();
+  const own = db
+    .prepare("SELECT dodo_customer_id FROM users WHERE id = ?")
+    .get(sessionUser.id) as { dodo_customer_id: string | null } | undefined;
+  let customerId = own?.dodo_customer_id ?? null;
+  if (!customerId) {
+    const sub = db
+      .prepare(
+        `SELECT dodo_customer_id FROM subscriptions
+         WHERE user_id = ? AND dodo_customer_id IS NOT NULL
+         ORDER BY updated_at DESC LIMIT 1`
+      )
+      .get(sessionUser.id) as { dodo_customer_id: string } | undefined;
+    customerId = sub?.dodo_customer_id ?? null;
+  }
+  if (!customerId) {
     return NextResponse.json(
-      { ok: false, error: "No billing profile yet — subscribe first." },
+      { ok: false, error: "No billing profile yet — add credit first." },
       { status: 404 }
     );
   }
 
   try {
-    const session = await getDodo().customers.customerPortal.create(sub.dodo_customer_id, {
+    const session = await getDodo().customers.customerPortal.create(customerId, {
       return_url: `${dashboardBaseUrl()}/billing`,
     });
     return NextResponse.json({ ok: true, url: session.link });

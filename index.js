@@ -115,17 +115,21 @@ function requireApiKey(req, res, next) {
 }
 
 /**
- * Plan enforcement for the two /v1/* routes — runs AFTER
- * requireApiKey (needs req.apiKey.userId), so mount it second:
+ * Prepaid-balance enforcement for the two /v1/* routes — runs
+ * AFTER requireApiKey (needs req.apiKey.userId), so mount it
+ * second:
  *   app.post("/v1/messages", requireApiKey, requireActivePlan, ...)
  *
- * Off by default: PLAN_ENFORCEMENT=1 turns on paid-plan gating.
- * The rollout deploys this dormant, the operator subscribes, then
+ * Off by default: PLAN_ENFORCEMENT=1 turns on balance gating.
+ * The rollout deploys this dormant, the operator tops up, then
  * the flag flips (and it doubles as the rollback switch).
  *
  * Skipped in bootstrap mode (zero keys => unauthenticated traffic
- * has no account to enforce). On success sets req.plan for the
- * tier gates downstream: { allowedTiers: string[]|null }.
+ * has no account to enforce). Requests keep working into a small
+ * negative balance (plans.GRACE_USD) so a request in flight or a
+ * brief usage spike never gets hard-cut; at or below -GRACE_USD
+ * the gate blocks with 402. On success sets req.plan for the
+ * (dormant) tier gates downstream: { allowedTiers: null }.
  */
 function requireActivePlan(req, res, next) {
   if (process.env.PLAN_ENFORCEMENT !== "1" || !req.apiKey) {
@@ -137,14 +141,14 @@ function requireActivePlan(req, res, next) {
     return res.status(402).json({
       type: "error",
       error: {
-        type: "subscription_required",
+        type: "key_not_linked",
         code: "key_not_linked",
         message:
-          "This API key isn't linked to an account. Recreate it from the dashboard (API Keys page), then subscribe.",
+          "This API key isn't linked to an account. Recreate it from the dashboard (API Keys page), then add credit on the Billing page.",
       },
     });
   }
-  const state = plans.getUserPlanState(userId);
+  const state = plans.getUserBalance(userId);
   if (state.userStatus === "suspended") {
     return res.status(403).json({
       type: "error",
@@ -155,36 +159,38 @@ function requireActivePlan(req, res, next) {
       },
     });
   }
-  if (!state.effectivePlan) {
+  if (state.userStatus !== "active") {
+    // 'pending' accounts (signed up, never topped up) are blocked
+    // here; the first top-up payment flips them to 'active'.
     return res.status(402).json({
       type: "error",
       error: {
-        type: "subscription_required",
-        code: "no_active_subscription",
-        message: "No active subscription. Subscribe in the dashboard's Billing page to use the API.",
+        type: "account_inactive",
+        code: "account_inactive",
+        message:
+          "This account isn't active yet. Add credit on the dashboard's Billing page to activate it.",
       },
     });
   }
-  const quota = plans.checkQuota(userId, state.planId);
-  if (!quota.ok) {
+  if (state.balanceUsd <= -plans.GRACE_USD) {
     return res.status(402).json({
       type: "error",
       error: {
-        type: "quota_exceeded",
-        code: "quota_exceeded",
-        message: `Monthly usage quota reached ($${quota.usedUsd.toFixed(2)} of $${quota.quotaUsd}). It resets on the 1st (UTC).`,
-        usageUsd: quota.usedUsd,
-        quotaUsd: quota.quotaUsd,
+        type: "insufficient_balance",
+        code: "insufficient_balance",
+        message: `Credit balance exhausted ($${state.balanceUsd.toFixed(2)}). Add credit on the dashboard's Billing page to keep using the API.`,
+        balanceUsd: state.balanceUsd,
       },
     });
   }
-  req.plan = { allowedTiers: state.effectivePlan.tiers };
+  req.plan = { allowedTiers: null }; // balance-based billing: all tiers
   next();
 }
 
 /**
- * 403 for a model outside the caller's plan tiers. Only called
- * when req.plan.allowedTiers is set (enforcement on + subscribed).
+ * 403 for a model outside the caller's plan tiers. Dormant while
+ * billing is balance-based (allowedTiers is always null) — kept
+ * for a future tiered catalog.
  */
 function tierDenial(res, model) {
   return res.status(403).json({
@@ -1070,21 +1076,26 @@ app.post("/v1/messages", requireApiKey, requireActivePlan, async (req, res) => {
     }
 
     // --- Metrics: one record per request ---
-    if (classification) {
-      const servingAttempt =
-        providerAttempts.find((a) => a.ok) || providerAttempts[0] || null;
-      metrics.record({
-        prompt: getLastUserMessage(req.body.messages),
-        classification,
-        classifierMs,
-        classifierCost: classification.metadata?.classifierCost || null,
-        route: routeResult,
-        providerFallbacks: fallbacksUsed,
-        providerResult: servingAttempt,
-        compaction: compactionResult,
-        userId: req.apiKey?.userId || null,
-      });
+    // Unconditional: explicit-model requests never run the
+    // classifier (classification stays null) but still bill —
+    // usage_daily drives the prepaid balance debit, so recording
+    // only classified requests would let a caller dodge the meter
+    // by pinning a model name.
+    const servingAttempt =
+      providerAttempts.find((a) => a.ok) || providerAttempts[0] || null;
+    metrics.record({
+      prompt: getLastUserMessage(req.body.messages),
+      classification,
+      classifierMs,
+      classifierCost: classification?.metadata?.classifierCost || null,
+      route: routeResult,
+      providerFallbacks: fallbacksUsed,
+      providerResult: servingAttempt,
+      compaction: compactionResult,
+      userId: req.apiKey?.userId || null,
+    });
 
+    if (classification) {
       // DEBUG: token + cost breakdown for this request.
       logCostBreakdown({
         systemText: extractSystemText(req.body.system),
@@ -1515,9 +1526,9 @@ app.listen(PORT, () => {
     `   debug dump  : ${process.env.DEBUG_DUMP === "1" ? "ON (system.txt)" : "off"}`
   );
   console.log(
-    `   plans       : ${
+    `   billing     : ${
       process.env.PLAN_ENFORCEMENT === "1"
-        ? `ENFORCING (env=${plans.environment})`
+        ? `ENFORCING prepaid balance (grace $${plans.GRACE_USD.toFixed(2)}, env=${plans.environment})`
         : "off (PLAN_ENFORCEMENT unset)"
     }`
   );

@@ -245,20 +245,50 @@ export default function ApiKeysPage() {
         </ul>
       )}
 
+      <Panel title="Claude Code" note="Anthropic-compatible endpoint">
+        <div className="flex flex-col gap-4">
+          <div>
+            <p className="mb-1.5 text-xs font-medium text-ink-2">
+              Point Claude Code at the proxy
+            </p>
+            <pre className="overflow-x-auto rounded-lg bg-surface-2 px-3 py-2 font-mono text-[11px] leading-relaxed text-ink-2">{`export ANTHROPIC_BASE_URL=https://app.steerosai.com
+export ANTHROPIC_AUTH_TOKEN=sk-relay-...
+claude`}</pre>
+          </div>
+          <div>
+            <p className="mb-1.5 text-xs font-medium text-ink-2">
+              Or persist it for every session — ~/.claude/settings.json
+            </p>
+            <pre className="overflow-x-auto rounded-lg bg-surface-2 px-3 py-2 font-mono text-[11px] leading-relaxed text-ink-2">{`{
+  "env": {
+    "ANTHROPIC_BASE_URL": "https://app.steerosai.com",
+    "ANTHROPIC_AUTH_TOKEN": "sk-relay-..."
+  }
+}`}</pre>
+          </div>
+          <p className="text-[13px] leading-relaxed text-ink-2">
+            Claude Code speaks the same Anthropic message format, so the key just slots in —
+            requests are classified and routed server-side (default auto mode), no model flags
+            needed. Same base URL and key work for any Anthropic-compatible client (SDKs, aider,
+            Cursor).
+          </p>
+        </div>
+      </Panel>
+
       <Panel title="Using a key" note="either header works">
         <div className="flex flex-col gap-4">
           <div>
             <p className="mb-1.5 text-xs font-medium text-ink-2">
               Authorization: Bearer — recommended
             </p>
-            <pre className="overflow-x-auto rounded-lg bg-surface-2 px-3 py-2 font-mono text-[11px] leading-relaxed text-ink-2">{`curl http://localhost:8002/v1/messages \\
+            <pre className="overflow-x-auto rounded-lg bg-surface-2 px-3 py-2 font-mono text-[11px] leading-relaxed text-ink-2">{`curl https://app.steerosai.com/v1/messages \\
   -H "Authorization: Bearer sk-relay-..." \\
   -H "Content-Type: application/json" \\
   -d '{"model":"auto","messages":[{"role":"user","content":"hi"}]}'`}</pre>
           </div>
           <div>
             <p className="mb-1.5 text-xs font-medium text-ink-2">x-api-key</p>
-            <pre className="overflow-x-auto rounded-lg bg-surface-2 px-3 py-2 font-mono text-[11px] leading-relaxed text-ink-2">{`curl http://localhost:8002/v1/messages \\
+            <pre className="overflow-x-auto rounded-lg bg-surface-2 px-3 py-2 font-mono text-[11px] leading-relaxed text-ink-2">{`curl https://app.steerosai.com/v1/messages \\
   -H "x-api-key: sk-relay-..." \\
   -H "Content-Type: application/json" \\
   -d '{"model":"auto","messages":[{"role":"user","content":"hi"}]}'`}</pre>

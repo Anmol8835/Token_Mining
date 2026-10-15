@@ -165,6 +165,7 @@ const mergeStmt = db.prepare(
      cache_write_tokens  = cache_write_tokens + ?,
      cost_usd            = cost_usd + ?,
      classifier_cost_usd = classifier_cost_usd + ?,
+     compaction_cost_usd = compaction_cost_usd + ?,
      baseline_cost_usd   = baseline_cost_usd + ?
    WHERE user_id = ? AND day = ?`
 );
@@ -185,6 +186,7 @@ db.transaction(() => {
       row.cache_write_tokens,
       row.cost_usd,
       row.classifier_cost_usd,
+      row.compaction_cost_usd || 0,
       row.baseline_cost_usd,
       user.id,
       row.day

@@ -17,9 +17,12 @@
 -- ============================================================
 
 -- Accounts. Created via db/create-user.js (operator) or open
--- signup in the dashboard (status starts 'pending'). The plan
--- columns are denormalized from the subscriptions table by the
--- webhook handler so the per-request plan check is one row read.
+-- signup in the dashboard (status starts 'pending'; the first
+-- top-up payment flips it to 'active'). balance_usd is the
+-- prepaid credit written by the payment webhook handler and
+-- debited by the metrics flush (lib/metrics.js) — the per-request
+-- balance check is one row read. plan/plan_expiry are legacy
+-- subscription columns, dormant.
 CREATE TABLE IF NOT EXISTS users (
   id            TEXT PRIMARY KEY,
   email         TEXT UNIQUE NOT NULL,
@@ -27,8 +30,10 @@ CREATE TABLE IF NOT EXISTS users (
   name          TEXT,
   created_at    INTEGER NOT NULL,       -- epoch ms
   status        TEXT NOT NULL DEFAULT 'active',  -- 'active' | 'pending' | 'suspended'
-  plan          TEXT NOT NULL DEFAULT 'none',    -- plan id from config/plans.json
-  plan_expiry   INTEGER                          -- epoch ms; NULL = no active period
+  plan          TEXT NOT NULL DEFAULT 'none',    -- legacy (subscriptions); unused
+  plan_expiry   INTEGER,                         -- legacy (subscriptions); unused
+  balance_usd   REAL NOT NULL DEFAULT 0,         -- prepaid credit; negative = overage into the $1 grace
+  dodo_customer_id TEXT                          -- Dodo customer id (for the billing portal)
 );
 
 -- Opaque login sessions. The cookie holds the raw 32-byte token;
@@ -62,14 +67,15 @@ CREATE TABLE IF NOT EXISTS api_keys (
 -- no per-request detail — only aggregate money/tokens.
 --   cost_usd          = provider spend
 --   classifier_cost_usd = LLM-classifier spend (classified requests)
+--   compaction_cost_usd = conversation-compaction spend (summarizer calls)
 --   baseline_cost_usd = the same traffic priced on the PRIMARY
 --     baseline model (pricing.baselines[0] — the flagship).
---   saved = baseline_cost_usd − (cost_usd + classifier_cost_usd),
---     derived at read time, never stored.
--- Compaction cost stays global-only (recordCompaction has no
--- user context). Unattributed traffic (zero-key bootstrap mode)
--- lands under user_id 'anonymous' (NULL would break the PK —
--- SQLite treats NULLs as distinct in primary keys).
+--   saved = baseline_cost_usd − (cost_usd + classifier_cost_usd +
+--     compaction_cost_usd), derived at read time, never stored.
+-- The first three columns drive the prepaid balance debit.
+-- Unattributed traffic (zero-key bootstrap mode) lands under
+-- user_id 'anonymous' (NULL would break the PK — SQLite treats
+-- NULLs as distinct in primary keys).
 CREATE TABLE IF NOT EXISTS usage_daily (
   user_id             TEXT NOT NULL,
   day                 TEXT NOT NULL,    -- 'YYYY-MM-DD' (UTC)
@@ -80,6 +86,7 @@ CREATE TABLE IF NOT EXISTS usage_daily (
   cache_write_tokens  INTEGER NOT NULL DEFAULT 0,
   cost_usd            REAL NOT NULL DEFAULT 0,
   classifier_cost_usd REAL NOT NULL DEFAULT 0,
+  compaction_cost_usd REAL NOT NULL DEFAULT 0,
   baseline_cost_usd   REAL NOT NULL DEFAULT 0,
   PRIMARY KEY (user_id, day)
 );

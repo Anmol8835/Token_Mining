@@ -1,15 +1,31 @@
 {
-  "updated": "2026-10-05",
-  "notes": "MIRROR of the repo-root config/plans.json (the dashboard build context is dashboard/, so it can't reach ../config — same convention as lib/schema.sql). Keep in sync; the copy is shipped by the Dockerfile.",
-  "plans": [
+  "updated": "2026-10-15",
+  "notes": "MIRROR of ../config/plans.json (the dashboard build context can't reach ../config) — keep the topups array byte-identical to the proxy's copy. Top-ups are Dodo one-time products; amountUsd is USD dollars for display — the credited balance is the pre-tax amount Dodo reports (total_amount minus tax). Dodo product prices are entered in cents.",
+  "topups": [
     {
-      "id": "monthly",
-      "name": "Monthly",
-      "priceUsd": 9,
-      "monthlyQuotaUsd": 10,
-      "tiers": ["cheap", "pro"],
+      "id": "t5",
+      "name": "$5 credit",
+      "amountUsd": 5,
       "products": {
-        "test_mode": "pdt_test_REPLACE_ME",
+        "test_mode": "pdt_0NpnSGHN8FBmBwT17k7DH",
+        "live_mode": "pdt_live_REPLACE_ME"
+      }
+    },
+    {
+      "id": "t10",
+      "name": "$10 credit",
+      "amountUsd": 10,
+      "products": {
+        "test_mode": "pdt_0NpnSMyzVfGt5gWmZqvna",
+        "live_mode": "pdt_live_REPLACE_ME"
+      }
+    },
+    {
+      "id": "t20",
+      "name": "$20 credit",
+      "amountUsd": 20,
+      "products": {
+        "test_mode": "pdt_0NpnSQSmsHhMJxpUNoIuU",
         "live_mode": "pdt_live_REPLACE_ME"
       }
     }

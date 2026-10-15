@@ -53,6 +53,24 @@ export function getDb(): Database.Database {
       _db.exec("ALTER TABLE users ADD COLUMN plan_expiry INTEGER");
       console.log("[db] migrated: users.plan_expiry");
     }
+    if (!cols.includes("balance_usd")) {
+      _db.exec("ALTER TABLE users ADD COLUMN balance_usd REAL NOT NULL DEFAULT 0");
+      console.log("[db] migrated: users.balance_usd");
+    }
+    if (!cols.includes("dodo_customer_id")) {
+      _db.exec("ALTER TABLE users ADD COLUMN dodo_customer_id TEXT");
+      console.log("[db] migrated: users.dodo_customer_id");
+    }
+    const dailyCols = _db
+      .prepare("PRAGMA table_info(usage_daily)")
+      .all()
+      .map((c) => (c as { name: string }).name);
+    if (dailyCols.length && !dailyCols.includes("compaction_cost_usd")) {
+      _db.exec(
+        "ALTER TABLE usage_daily ADD COLUMN compaction_cost_usd REAL NOT NULL DEFAULT 0"
+      );
+      console.log("[db] migrated: usage_daily.compaction_cost_usd");
+    }
   } catch (err) {
     console.warn("[db] migrate skipped:", (err as Error).message);
   }
