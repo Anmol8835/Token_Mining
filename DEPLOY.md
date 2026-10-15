@@ -298,6 +298,14 @@ API blocks once the balance reaches -$1.00 (grace). Deploy the billing
 code with `PLAN_ENFORCEMENT` **unset** (default off — every key keeps full
 access). Enforce only after the flow below is verified in test mode.
 
+**Never put test-mode Dodo config on production.** Signup is open, so
+`DODO_PAYMENTS_ENVIRONMENT=test_mode` (or a test API key with test
+`pdt_…` ids) on the public host lets anyone pay with a Dodo test card
+and mint real credit. Keep test-mode keys/ids/ENVIRONMENT local only;
+production ships with live-mode config — or, until the live products
+exist, with no `DODO_*` variables at all (checkout then returns 503 and
+the billing page shows the not-configured note).
+
 1. **Create the products** in the [Dodo dashboard](https://app.dodopayments.com)
    in *test mode*: three **one-time payment** products (NOT subscription),
    prices **5 / 10 / 20 dollars** (Dodo takes cents — enter 500/1000/2000).
