@@ -8,7 +8,7 @@
       "amountUsd": 5,
       "products": {
         "test_mode": "pdt_0NpnSGHN8FBmBwT17k7DH",
-        "live_mode": "pdt_live_REPLACE_ME"
+        "live_mode": "pdt_0NpnrieJNvTc6qltm9B4x"
       }
     },
     {
@@ -17,7 +17,7 @@
       "amountUsd": 10,
       "products": {
         "test_mode": "pdt_0NpnSMyzVfGt5gWmZqvna",
-        "live_mode": "pdt_live_REPLACE_ME"
+        "live_mode": "pdt_0NpnrlnXa6obi9iLFFQ7u"
       }
     },
     {
@@ -26,7 +26,7 @@
       "amountUsd": 20,
       "products": {
         "test_mode": "pdt_0NpnSQSmsHhMJxpUNoIuU",
-        "live_mode": "pdt_live_REPLACE_ME"
+        "live_mode": "pdt_0NpnroTxnAgAZiRVZcxqv"
       }
     }
   ]
