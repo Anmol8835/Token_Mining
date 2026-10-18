@@ -32,7 +32,7 @@ Every stage supports `--resume`, `--limit N`, `--dry-run`.
 
 ## Prerequisites
 
-- Proxy running on `:8002` (router path only; tier baselines call providers directly)
+- Proxy running on `:8002` (router path only; tier baselines call providers directly). Once the proxy has API keys enabled, also set `BENCHMARK_API_KEY` in `.env` to one of them.
 - Python prep: `benchmark/.venv` (`python3 -m venv .venv && .venv/bin/pip install datasets numpy scipy scikit-learn faker`)
 - API keys in `.env`: `DEEPSEEK_API_KEY` and `CLAUDE_API_KEY`
 - `POST /metrics/reset?global=1` before a run to isolate benchmark traffic from production metrics (otherwise the proxy's global cost counter includes it)

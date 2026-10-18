@@ -1,0 +1,9 @@
+# The Dockerfile installs deps itself (pnpm install --frozen-lockfile);
+# copying the host's pnpm tree would overwrite the container's fresh
+# install with host-store symlinks and blow up the build context.
+node_modules
+.next
+# Never bake local env into the build context: dashboard/.env.local
+# holds the test-mode Dodo keys locally, and in production env comes
+# from compose env_file at runtime — not the image.
+.env*

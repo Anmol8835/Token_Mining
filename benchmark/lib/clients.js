@@ -130,6 +130,12 @@ async function callRouterViaProxy(prompt, opts = {}) {
       headers: {
         "Content-Type": "application/json",
         "X-Routing-Mode": opts.mode ?? "cheap",
+        // The proxy requires an API key once one has been created
+        // (see the dashboard's API Keys page). Point this env var at
+        // one of those keys to keep benchmark runs working.
+        ...(process.env.BENCHMARK_API_KEY
+          ? { "x-api-key": process.env.BENCHMARK_API_KEY }
+          : {}),
       },
       timeout: 300000,
     }

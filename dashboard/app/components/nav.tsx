@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ArrowsSplit, Cube, Gauge, ListDashes, Shuffle } from "@phosphor-icons/react";
+import { ArrowsSplit, CreditCard, Cube, Gauge, Key, ListDashes, Shuffle, SignOut } from "@phosphor-icons/react";
 import { usePoll } from "@/app/lib/use-poll";
 import { ThemeToggle } from "@/app/components/theme-toggle";
 
@@ -11,6 +11,8 @@ const LINKS = [
   { href: "/models", label: "Models", icon: Cube },
   { href: "/routing", label: "Routing", icon: Shuffle },
   { href: "/activity", label: "Activity", icon: ListDashes },
+  { href: "/api-keys", label: "API Keys", icon: Key },
+  { href: "/billing", label: "Billing", icon: CreditCard },
 ];
 
 function isActive(pathname: string, href: string) {
@@ -23,11 +25,18 @@ function isActive(pathname: string, href: string) {
  * the top bar collapses to a single sticky header with an inline link
  * row, status hidden below sm.
  */
-export function Nav() {
+export function Nav({ user = null }: { user?: { email: string; name: string | null } | null }) {
   const pathname = usePathname();
   const { data: health, stale } = usePoll<{ status: string }>("/api/server/health", 5000);
   const online = health?.status === "ok";
   const connecting = !health && !stale;
+
+  // Session cookie is httpOnly — sign-out deletes it server-side,
+  // then a full reload lands on /login (proxy.ts redirects).
+  async function signOut() {
+    await fetch("/api/auth/logout", { method: "POST" }).catch(() => {});
+    window.location.href = "/login";
+  }
 
   return (
     <>
@@ -58,7 +67,16 @@ export function Nav() {
             );
           })}
         </nav>
-        <div className="ml-auto shrink-0">
+        <div className="ml-auto flex shrink-0 items-center gap-1">
+          {user && (
+            <button
+              onClick={signOut}
+              title="Sign out"
+              className="rounded-lg p-2 text-ink-3 hover:bg-surface-2/60 hover:text-ink"
+            >
+              <SignOut size={16} />
+            </button>
+          )}
           <ThemeToggle />
         </div>
       </header>
@@ -93,6 +111,24 @@ export function Nav() {
             );
           })}
         </nav>
+
+        {user && (
+          <div className="flex items-center justify-between gap-2 border-t border-line px-4 py-3">
+            <div className="min-w-0">
+              <p className="truncate text-[13px] font-medium text-ink">
+                {user.name || user.email}
+              </p>
+              <p className="truncate text-xs text-ink-3">{user.email}</p>
+            </div>
+            <button
+              onClick={signOut}
+              title="Sign out"
+              className="shrink-0 rounded-lg p-1.5 text-ink-3 hover:bg-surface-2/60 hover:text-ink"
+            >
+              <SignOut size={16} />
+            </button>
+          </div>
+        )}
 
         <div className="flex items-center justify-between border-t border-line px-4 py-3">
           <span className="flex items-center gap-1.5 text-xs text-ink-3">

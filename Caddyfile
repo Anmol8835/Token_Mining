@@ -1,0 +1,38 @@
+# Single hostname, path routing: backend API paths go to the Express
+# proxy; everything else (the console UI + its /api/server/* helper
+# routes) goes to the Next.js dashboard.
+#
+# NOTE: migrate to a real domain by changing DOMAIN in .env; to split
+# into two hostnames later (api.* + dash.*), give each its own site
+# block here.
+{$DOMAIN} {
+	encode gzip
+
+	handle /v1/* {
+		reverse_proxy llm-proxy:8002
+	}
+	handle /health {
+		reverse_proxy llm-proxy:8002
+	}
+	handle /metrics* {
+		reverse_proxy llm-proxy:8002
+	}
+	handle /config* {
+		reverse_proxy llm-proxy:8002
+	}
+	# Dodo Payments webhooks — public; authenticated by the Dodo
+	# signature (DODO_PAYMENTS_WEBHOOK_KEY), never by ADMIN_TOKEN.
+	handle /webhooks* {
+		reverse_proxy llm-proxy:8002
+	}
+
+	# Public auth API for the marketing site — signup/login/logout/me
+	# (SSO with the dashboard via Domain=.steerosai.com cookies).
+	handle /auth* {
+		reverse_proxy llm-proxy:8002
+	}
+
+	handle {
+		reverse_proxy dashboard:3000
+	}
+}

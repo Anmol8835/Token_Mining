@@ -4,6 +4,7 @@ const express = require("express");
 const axios = require("axios");
 const path = require("path");
 const fs = require("fs");
+const crypto = require("crypto");
 
 const ProviderRegistry = require("./lib/providers");
 const HybridClassifier = require("./lib/classifier");
@@ -12,6 +13,12 @@ const { toPublicShape } = require("./lib/classifier/taxonomy");
 const { getLastUserMessage, extractSystemText } = require("./lib/classifier/text-utils");
 const metrics = require("./lib/metrics");
 const prefs = require("./lib/prefs");
+const userPrefs = require("./lib/user-prefs");
+const apiKeys = require("./lib/api-keys");
+const plans = require("./lib/plans");
+const webhooks = require("./lib/webhooks");
+const authApi = require("./lib/auth-api");
+const authGoogle = require("./lib/auth-google");
 const {
   META_TOOL_NAME,
   buildPrunedBody,
@@ -57,6 +64,205 @@ function attachClassification(res, classification, debug) {
     console.warn(`[classify] Could not set X-Classification header: ${err.message}`);
   }
   return payload;
+}
+
+// ------------------------------------------------------------
+// API key auth — gates /v1/messages and /v1/classify
+// ------------------------------------------------------------
+
+/**
+ * Pull a client key out of the request: `Authorization: Bearer <key>`
+ * first (OpenAI/Anthropic convention), then `x-api-key`. Scheme is
+ * case-insensitive per RFC 7235.
+ */
+function extractRawKey(req) {
+  const auth = req.headers.authorization;
+  const bearer = typeof auth === "string" ? auth.match(/^Bearer\s+(.+)$/i) : null;
+  if (bearer) return bearer[1].trim();
+  const xKey = req.headers["x-api-key"];
+  return typeof xKey === "string" && xKey ? xKey : null;
+}
+
+/**
+ * Express middleware for the two /v1/* routes. While zero keys exist
+ * the server stays open (bootstrap — the first key is created from
+ * the dashboard); once one exists, every request must carry a valid
+ * key or gets Anthropic's exact 401 authentication_error envelope.
+ *
+ * Runs after the global express.json body parser, so unauthenticated
+ * payloads never reach the system.txt debug dump below.
+ */
+function requireApiKey(req, res, next) {
+  if (apiKeys.count() === 0) {
+    console.warn(
+      "[api-keys] no keys configured — allowing unauthenticated request " +
+      "(bootstrap; create a key in the dashboard)"
+    );
+    return next();
+  }
+  const raw = extractRawKey(req);
+  const entry = raw ? apiKeys.verify(raw, req.path) : null;
+  if (!entry) {
+    return res.status(401).json({
+      type: "error",
+      error: { type: "authentication_error", message: "invalid x-api-key" },
+    });
+  }
+  // Verified key rides along — metrics.record() attributes the
+  // request to entry.userId for the per-account usage_daily store.
+  req.apiKey = entry;
+  next();
+}
+
+/**
+ * Prepaid-balance enforcement for the two /v1/* routes — runs
+ * AFTER requireApiKey (needs req.apiKey.userId), so mount it
+ * second:
+ *   app.post("/v1/messages", requireApiKey, requireActivePlan, ...)
+ *
+ * Off by default: PLAN_ENFORCEMENT=1 turns on balance gating.
+ * The rollout deploys this dormant, the operator tops up, then
+ * the flag flips (and it doubles as the rollback switch).
+ *
+ * Skipped in bootstrap mode (zero keys => unauthenticated traffic
+ * has no account to enforce). Requests keep working into a small
+ * negative balance (plans.GRACE_USD) so a request in flight or a
+ * brief usage spike never gets hard-cut; at or below -GRACE_USD
+ * the gate blocks with 402. On success sets req.plan for the
+ * (dormant) tier gates downstream: { allowedTiers: null }.
+ */
+function requireActivePlan(req, res, next) {
+  if (process.env.PLAN_ENFORCEMENT !== "1" || !req.apiKey) {
+    req.plan = { allowedTiers: null };
+    return next();
+  }
+  const userId = req.apiKey.userId;
+  if (!userId) {
+    return res.status(402).json({
+      type: "error",
+      error: {
+        type: "key_not_linked",
+        code: "key_not_linked",
+        message:
+          "This API key isn't linked to an account. Recreate it from the dashboard (API Keys page), then add credit on the Billing page.",
+      },
+    });
+  }
+  const state = plans.getUserBalance(userId);
+  if (state.userStatus === "suspended") {
+    return res.status(403).json({
+      type: "error",
+      error: {
+        type: "account_suspended",
+        code: "account_suspended",
+        message: "Account suspended.",
+      },
+    });
+  }
+  if (state.userStatus !== "active") {
+    // 'pending' accounts (signed up, never topped up) are blocked
+    // here; the first top-up payment flips them to 'active'.
+    return res.status(402).json({
+      type: "error",
+      error: {
+        type: "account_inactive",
+        code: "account_inactive",
+        message:
+          "This account isn't active yet. Add credit on the dashboard's Billing page to activate it.",
+      },
+    });
+  }
+  if (state.balanceUsd <= -plans.GRACE_USD) {
+    return res.status(402).json({
+      type: "error",
+      error: {
+        type: "insufficient_balance",
+        code: "insufficient_balance",
+        message: `Credit balance exhausted ($${state.balanceUsd.toFixed(2)}). Add credit on the dashboard's Billing page to keep using the API.`,
+        balanceUsd: state.balanceUsd,
+      },
+    });
+  }
+  req.plan = { allowedTiers: null }; // balance-based billing: all tiers
+  next();
+}
+
+/**
+ * 403 for a model outside the caller's plan tiers. Dormant while
+ * billing is balance-based (allowedTiers is always null) — kept
+ * for a future tiered catalog.
+ */
+function tierDenial(res, model) {
+  return res.status(403).json({
+    type: "error",
+    error: {
+      type: "model_tier_denied",
+      code: "model_tier_denied",
+      model: model.id,
+      tier: plans.modelTier(model),
+      message: `Model "${model.id}" isn't available on your plan (${plans.modelTier(model)} tier). Upgrade to reach it.`,
+    },
+  });
+}
+
+/**
+ * Actor resolution for the /config/* and /metrics* surface.
+ *
+ * Historically one shared ADMIN_TOKEN gated these routes and the
+ * dashboard injected it for EVERY signed-in user — so every account
+ * was effectively an operator and saw every other account's keys,
+ * prompts and usage. Instead, resolve WHO is calling:
+ *
+ *   - valid x-admin-token          -> operator (full console; the
+ *     token comparison is timing-safe and always wins)
+ *   - valid steeros_session cookie -> user (scoped to its own keys,
+ *     usage and activity)
+ *   - no ADMIN_TOKEN configured    -> operator (local dev: the old
+ *     gate was a no-op there)
+ *   - anything else                -> 401 (fail closed)
+ *
+ * /health and /v1/* are deliberately NOT gated (health checks + API
+ * keys respectively); /auth/* sits above this mount too.
+ */
+function attachActor(req, res, next) {
+  const token = process.env.ADMIN_TOKEN;
+  const given = req.headers["x-admin-token"];
+  if (token && typeof given === "string") {
+    const a = Buffer.from(given);
+    const b = Buffer.from(token);
+    if (a.length === b.length && crypto.timingSafeEqual(a, b)) {
+      req.actor = { role: "operator", user: authApi.getSessionUserFromRequest(req) };
+      return next();
+    }
+  }
+
+  const user = authApi.getSessionUserFromRequest(req);
+  if (user) {
+    req.actor = { role: "user", user };
+    return next();
+  }
+
+  if (!token) {
+    req.actor = { role: "operator", user: null };
+    return next();
+  }
+
+  return res.status(401).json({ ok: false, error: "authentication required" });
+}
+
+/**
+ * Operator-only guard for global mutations (metrics reset/eval/demo,
+ * model + routing toggles). Anonymous callers never get past
+ * attachActor; a signed-in plain user lands here as a 403 — except
+ * in local dev with no ADMIN_TOKEN, where the gate is off entirely
+ * (attachActor already treats anonymous callers as operators there,
+ * so this adds no new exposure; it keeps the pre-scoping dev
+ * workflow where every mutation just worked).
+ */
+function requireOperator(req, res, next) {
+  if (req.actor?.role === "operator") return next();
+  if (!process.env.ADMIN_TOKEN) return next(); // dev: gate off
+  return res.status(403).json({ ok: false, error: "admin token required" });
 }
 
 // ============================================================
@@ -119,7 +325,17 @@ function loadConfig() {
 const app = express();
 const PORT = process.env.PORT || 8002;
 
-app.use(express.json({ limit: "50mb" }));
+app.use(
+  express.json({
+    limit: "50mb",
+    // Standard Webhooks signatures cover the raw request bytes —
+    // preserve them for the Dodo webhook route only (re-serializing
+    // the parsed body would change the bytes and break verification).
+    verify: (req, _res, buf) => {
+      if (req.path === "/webhooks/dodo") req.rawBody = buf;
+    },
+  })
+);
 
 // Dashboard — served from public/
 app.use(express.static(path.join(__dirname, "public")));
@@ -152,6 +368,12 @@ if (registry.getAllModels().length === 0) {
 }
 
 const classifier = new HybridClassifier(serverConfig, registry);
+
+const apiKeyCount = apiKeys.count();
+console.log(
+  `[api-keys] ${apiKeyCount} key(s) loaded — /v1/messages + /v1/classify enforcement ` +
+  (apiKeyCount > 0 ? "ON" : "OFF (no keys yet)")
+);
 
 
 // ------------------------------------------------------------
@@ -433,7 +655,7 @@ function emitConvertedAsSSE(res, converted, modelId) {
 // Returns ONLY the classification JSON. Never answers the prompt.
 // ============================================================
 
-app.post("/v1/classify", async (req, res) => {
+app.post("/v1/classify", requireApiKey, requireActivePlan, async (req, res) => {
   const startTime = Date.now();
   try {
     const debug = req.query.debug === "1" || req.headers["x-debug"] === "1";
@@ -450,6 +672,7 @@ app.post("/v1/classify", async (req, res) => {
       classifierCost: classification.metadata?.classifierCost || null,
       route: null,
       providerResult: null,
+      userId: req.apiKey?.userId || null,
     });
 
     // DEBUG: classifier-only cost breakdown.
@@ -479,7 +702,7 @@ app.post("/v1/classify", async (req, res) => {
 // POST /v1/messages
 // ============================================================
 
-app.post("/v1/messages", async (req, res) => {
+app.post("/v1/messages", requireApiKey, requireActivePlan, async (req, res) => {
   const startTime = Date.now();
   const promptText = getLastUserMessage(req.body.messages).replace(/\s+/g, " ").trim();
   console.log(`▶ prompt: ${promptText.slice(0, 160) || "(empty)"}`);
@@ -497,12 +720,17 @@ app.post("/v1/messages", async (req, res) => {
     // router's whole input, byte for byte. system.txt is gitignored —
     // raw payloads must never enter the repo (see the 2026-09-21
     // secret-scan incident).
-    fs.appendFileSync(
-      path.join(__dirname, "system.txt"),
-      `\n=== IN ${new Date().toISOString()} model=${modelName} ${stream ? "stream" : "non-stream"}` +
-        ` mode=${(req.headers["x-routing-mode"] || "default").toLowerCase()} ===\n` +
-        JSON.stringify(req.body, null, 2) + "\n"
-    );
+    // Off by default (was unconditional until 2026-10-02 — grew past
+    // 1GB of raw payloads on disk); enable per-process with
+    // DEBUG_DUMP=1 for routing debugging only.
+    if (process.env.DEBUG_DUMP === "1") {
+      fs.appendFileSync(
+        path.join(__dirname, "system.txt"),
+        `\n=== IN ${new Date().toISOString()} model=${modelName} ${stream ? "stream" : "non-stream"}` +
+          ` mode=${(req.headers["x-routing-mode"] || "default").toLowerCase()} ===\n` +
+          JSON.stringify(req.body, null, 2) + "\n"
+      );
+    }
 
     let selectedModel;
     let classification = null;
@@ -520,6 +748,16 @@ app.post("/v1/messages", async (req, res) => {
       }
     }
 
+    // Plan tier gate — explicit model requests are denied before
+    // any classifier or provider work happens.
+    if (
+      selectedModel &&
+      req.plan?.allowedTiers &&
+      !req.plan.allowedTiers.includes(plans.modelTier(selectedModel))
+    ) {
+      return tierDenial(res, selectedModel);
+    }
+
     if (!selectedModel) {
       // Auto mode: classify + route
       // Strip system prompt during classification — classifiers should
@@ -529,20 +767,64 @@ app.post("/v1/messages", async (req, res) => {
       classification = await classifier.classify(classBody);
       classifierMs = Date.now() - classStart;
 
-      // Parse routing mode from header (cost-reduction aware)
-      // X-Routing-Mode: cheap | fast | balanced | quality
-      // Header wins; otherwise the dashboard-configured default.
+      // Routing mode resolution (auto-routing only):
+      //   X-Routing-Mode header -> the caller's own saved mode ->
+      //   the operator's global default -> "cheap".
+      // The header always wins; a key without a user (bootstrap)
+      // gets global prefs only.
+      const userPrefRow = req.apiKey?.userId ? userPrefs.get(req.apiKey.userId) : null;
       const routingMode = (
-        req.headers["x-routing-mode"] || prefs.getRoutingMode() || "cheap"
+        req.headers["x-routing-mode"] ||
+        userPrefRow?.routingMode ||
+        prefs.getRoutingMode() ||
+        "cheap"
       ).toLowerCase();
       const validModes = ["cheap", "fast", "balanced", "quality"];
       const effectiveMode = validModes.includes(routingMode) ? routingMode : "cheap";
 
-      routeResult = selectModel(
-        classification, registry, serverConfig.router, null,
-        effectiveMode, prefs.getDisabledModels()
-      );
+      // Exclusions: the operator's global list always applies; the
+      // user's own list unions on top. Explicit model requests
+      // (handled above) bypass both.
+      const excludedIds = prefs.getDisabledModels();
+      if (userPrefRow) {
+        for (const id of userPrefRow.disabledModels) {
+          if (!excludedIds.includes(id)) excludedIds.push(id);
+        }
+      }
+
+      try {
+        routeResult = selectModel(
+          classification, registry, serverConfig.router, null,
+          effectiveMode, excludedIds, req.plan?.allowedTiers ?? null
+        );
+      } catch (err) {
+        // Plan tiers emptied the candidate pool — a plan denial,
+        // not a server fault.
+        if (err.code === "TIER_EXHAUSTED") {
+          return res.status(403).json({
+            type: "error",
+            error: {
+              type: "model_tier_denied",
+              code: "model_tier_denied",
+              message: "No model in your plan's tiers can serve this request.",
+            },
+          });
+        }
+        throw err;
+      }
       selectedModel = routeResult.model;
+      console.log(
+        `  → routed: ${selectedModel.id} (mode=${effectiveMode}, ${routeResult.reason || "no reason"})`
+      );
+
+      // Definitive post-check — covers every router escape hatch
+      // (widen blocks, policy filter, fallback branches).
+      if (
+        req.plan?.allowedTiers &&
+        !req.plan.allowedTiers.includes(plans.modelTier(selectedModel))
+      ) {
+        return tierDenial(res, selectedModel);
+      }
 
       // Surface the classification: always as a header, and in the
       // response body when debug is requested (non-streaming only).
@@ -571,7 +853,19 @@ app.post("/v1/messages", async (req, res) => {
     // uncompacted.
     let compactionResult = null;
     let compactionCost = null;
-    if (serverConfig.compaction?.enabled !== false) {
+    // Plan tier gate for the internal compaction model: if the
+    // caller's plan excludes its tier, skip compaction (the request
+    // proceeds uncompacted) rather than spend outside the plan.
+    const compactionModelId = serverConfig.compaction?.model || "deepseek-flash";
+    const compactionModel = registry.getModel(compactionModelId);
+    const compactionAllowed =
+      !req.plan?.allowedTiers ||
+      !compactionModel ||
+      req.plan.allowedTiers.includes(plans.modelTier(compactionModel));
+    if (!compactionAllowed && serverConfig.compaction?.enabled !== false) {
+      console.log(`[plan] compaction skipped (${compactionModelId} tier not in plan)`);
+    }
+    if (serverConfig.compaction?.enabled !== false && compactionAllowed) {
       try {
         compactionResult = await maybeCompact(req.body, { serverConfig, registry, selectedModel });
         if (compactionResult) {
@@ -748,6 +1042,15 @@ app.post("/v1/messages", async (req, res) => {
 
         if (!fallbackModel || !fallbackProvider) continue;
 
+        // Plan tier gate — never fail over into a disallowed tier.
+        if (
+          req.plan?.allowedTiers &&
+          !req.plan.allowedTiers.includes(plans.modelTier(fallbackModel))
+        ) {
+          console.warn(`[plan] fallback ${fallbackModel.id} skipped (tier not in plan)`);
+          continue;
+        }
+
         fallbacksUsed++;
         try {
           await serveModel(fallbackModel, fallbackProvider, req.body);
@@ -773,20 +1076,26 @@ app.post("/v1/messages", async (req, res) => {
     }
 
     // --- Metrics: one record per request ---
-    if (classification) {
-      const servingAttempt =
-        providerAttempts.find((a) => a.ok) || providerAttempts[0] || null;
-      metrics.record({
-        prompt: getLastUserMessage(req.body.messages),
-        classification,
-        classifierMs,
-        classifierCost: classification.metadata?.classifierCost || null,
-        route: routeResult,
-        providerFallbacks: fallbacksUsed,
-        providerResult: servingAttempt,
-        compaction: compactionResult,
-      });
+    // Unconditional: explicit-model requests never run the
+    // classifier (classification stays null) but still bill —
+    // usage_daily drives the prepaid balance debit, so recording
+    // only classified requests would let a caller dodge the meter
+    // by pinning a model name.
+    const servingAttempt =
+      providerAttempts.find((a) => a.ok) || providerAttempts[0] || null;
+    metrics.record({
+      prompt: getLastUserMessage(req.body.messages),
+      classification,
+      classifierMs,
+      classifierCost: classification?.metadata?.classifierCost || null,
+      route: routeResult,
+      providerFallbacks: fallbacksUsed,
+      providerResult: servingAttempt,
+      compaction: compactionResult,
+      userId: req.apiKey?.userId || null,
+    });
 
+    if (classification) {
       // DEBUG: token + cost breakdown for this request.
       logCostBreakdown({
         systemText: extractSystemText(req.body.system),
@@ -831,15 +1140,81 @@ app.get("/health", (req, res) => {
   });
 });
 
+// ------------------------------------------------------------
+// Dodo Payments webhook — authenticated by Dodo's Standard
+// Webhooks signature (DODO_PAYMENTS_WEBHOOK_KEY), NOT by the
+// admin token, so it must stay OUTSIDE the /config,/metrics
+// actor gate below. Caddy routes /webhooks/* here publicly.
+// 200 = processed (or duplicate); 500 = DB failure (Dodo
+// retries); 401 = bad signature (no retry — payload is garbage).
+// ------------------------------------------------------------
+app.post("/webhooks/dodo", (req, res) => {
+  if (!process.env.DODO_PAYMENTS_WEBHOOK_KEY) {
+    console.warn("[webhooks] DODO_PAYMENTS_WEBHOOK_KEY unset — refusing (Dodo will retry)");
+    return res.status(503).json({ ok: false, error: "webhooks not configured" });
+  }
+  let event;
+  try {
+    event = webhooks.verify(req.rawBody, req.headers);
+  } catch (err) {
+    console.warn("[webhooks] signature verification failed:", err.message);
+    return res.status(401).json({ ok: false, error: "invalid signature" });
+  }
+  // processEvent is synchronous (better-sqlite3); a throw here is
+  // a DB failure — 500 so Dodo retries.
+  try {
+    const result = webhooks.processEvent(event, req.headers["webhook-id"]);
+    console.log(`[webhooks] ${event.type} -> ${result.status}${result.error ? ` (${result.error})` : ""}`);
+    res.json({ ok: true, status: result.status });
+  } catch (err) {
+    console.error("[webhooks] processing failed:", err.message);
+    res.status(500).json({ ok: false });
+  }
+});
+
+// ------------------------------------------------------------
+// Public auth API — signup/login/logout/me for the marketing
+// site (steerosai.com). SSO with the dashboard: same
+// users/sessions tables, shared steeros_session cookie
+// (Domain=.steerosai.com via AUTH_COOKIE_DOMAIN). Open signup by
+// design — must stay OUTSIDE the /config,/metrics actor gate
+// below. Caddy routes /auth/* here publicly.
+// ------------------------------------------------------------
+app.post("/auth/signup", authApi.signup);
+app.post("/auth/login", authApi.login);
+app.post("/auth/logout", authApi.logout);
+app.get("/auth/me", authApi.me);
+
+// "Sign in with Google" — the whole OAuth dance runs here (start ->
+// Google -> callback), then 302s into the dashboard with the shared
+// steeros_session cookie. Also outside the actor gate.
+app.get("/auth/google/start", authGoogle.start);
+app.get("/auth/google/callback", authGoogle.callback);
+
+// Authenticated zone (see attachActor above). Mounted before the
+// route declarations so every /config/* and /metrics* route below
+// resolves its actor (operator | user | 401). /health, /v1/*,
+// /webhooks/* and /auth/* are declared above and stay ungated; the
+// static middleware is unaffected.
+app.use(["/config", "/metrics"], attachActor);
+
 // ============================================================
 // Metrics endpoints — consumed by the dashboard in public/
 // ============================================================
 
 app.get("/metrics", (req, res) => {
-  res.json(metrics.snapshot());
+  // Operator: the whole process. Anyone else: scoped to their own
+  // account — session aggregates, their ring-buffer records and
+  // usage_daily-backed all-time totals.
+  const actor = req.actor;
+  const snapshot = metrics.snapshot(
+    actor.role === "operator" ? null : actor.user.id
+  );
+  snapshot.viewer = { role: actor.role, userId: actor.user?.id ?? null };
+  res.json(snapshot);
 });
 
-app.post("/metrics/reset", (req, res) => {
+app.post("/metrics/reset", requireOperator, (req, res) => {
   metrics.reset();
   // ?global=1 also wipes the persisted all-time counter.
   if (req.query.global === "1") metrics.resetGlobal();
@@ -848,7 +1223,7 @@ app.post("/metrics/reset", (req, res) => {
 
 // Run the labeled eval set (config/eval-prompts.json) through the
 // real classifier and store the accuracy summary for the dashboard.
-app.post("/metrics/eval", async (req, res) => {
+app.post("/metrics/eval", requireOperator, async (req, res) => {
   try {
     const summary = await runEvalSet(
       classifier,
@@ -865,7 +1240,7 @@ app.post("/metrics/eval", async (req, res) => {
 // Generate a burst of representative traffic through the REAL
 // classifier + router (no provider calls) so the dashboard can be
 // evaluated without hammering the APIs.
-app.post("/metrics/demo", async (req, res) => {
+app.post("/metrics/demo", requireOperator, async (req, res) => {
   const DEMO_PROMPTS = [
     "hi",
     "What is the current stock price of NVDA right now?",
@@ -932,7 +1307,7 @@ app.post("/metrics/demo", async (req, res) => {
 // Consumed by the Next.js dashboard; prefs persist in data/.
 // ============================================================
 
-function dashboardCatalog() {
+function dashboardCatalog(actor) {
   // Static display data: router policy + benchmark report (may not exist).
   let policy = null;
   let benchmark = null;
@@ -950,6 +1325,14 @@ function dashboardCatalog() {
     );
   } catch (_) {}
 
+  // Scoped users see THEIR selection on top of the operator's global
+  // one: a model reads enabled only if the operator hasn't disabled
+  // it AND the user hasn't. Operators (and any caller without an
+  // actor) get the global view, byte-identical to before.
+  const user = actor?.role === "user" ? actor.user : null;
+  const globalDisabled = prefs.getDisabledModels();
+  const userRow = user ? userPrefs.get(user.id) : null;
+
   // All configured models, with provider availability. Unavailable
   // providers (missing API key) can't serve traffic, so they read as
   // disabled in the UI even though they aren't in the prefs file.
@@ -961,15 +1344,27 @@ function dashboardCatalog() {
     capabilities: m.capabilities,
     profile: m.profile,
     available: !!registry.getProvider(m.id),
-    enabled: !!registry.getProvider(m.id) && prefs.isModelEnabled(m.id),
+    enabled:
+      !!registry.getProvider(m.id) &&
+      prefs.isModelEnabled(m.id) &&
+      !(userRow ? userRow.disabledModels.includes(m.id) : false),
   }));
 
   return {
     models,
     prefs: {
-      routingMode: prefs.getRoutingMode(),
-      disabledModels: prefs.getDisabledModels(),
+      // Effective mode for users (their own, else inherited global)
+      // so the routing page highlights what auto-routing will use;
+      // null only when nothing is saved anywhere.
+      routingMode: user
+        ? userRow.routingMode ?? prefs.getRoutingMode()
+        : prefs.getRoutingMode(),
+      disabledModels: user ? userRow.disabledModels : globalDisabled,
     },
+    // Models the operator locked globally. Always empty for the
+    // operator's own view (their toggles edit that very list); for
+    // users it drives the locked "admin off" rows in the UI.
+    adminDisabledModels: user ? globalDisabled : [],
     routingModes: prefs.VALID_MODES,
     classifier: {
       mode: serverConfig.classifier?.mode || "auto",
@@ -981,10 +1376,12 @@ function dashboardCatalog() {
 }
 
 app.get("/config/dashboard", (req, res) => {
-  res.json(dashboardCatalog());
+  res.json(dashboardCatalog(req.actor));
 });
 
 // Toggle a model in/out of the auto-routing candidate pool.
+// Operators edit the global list; signed-in users edit their own
+// (union semantics — the global list always still applies).
 app.post("/config/models", (req, res) => {
   const { id, enabled } = req.body || {};
   if (typeof id !== "string" || typeof enabled !== "boolean") {
@@ -998,17 +1395,33 @@ app.post("/config/models", (req, res) => {
   const availableIds = registry
     .getAllModels()
     .map((m) => m.id);
-  const result = prefs.setModelEnabled(id, enabled, availableIds);
+  const globalDisabled = prefs.getDisabledModels();
+  const result =
+    req.actor?.role === "operator"
+      ? prefs.setModelEnabled(id, enabled, availableIds)
+      : userPrefs.setModelEnabled(
+          req.actor.user.id,
+          id,
+          enabled,
+          // Models the operator disabled are not part of this user's
+          // pool, so they don't count toward "the last one".
+          availableIds.filter((mid) => !globalDisabled.includes(mid))
+        );
   if (!result.ok) {
     return res.status(400).json(result);
   }
-  res.json({ ok: true, catalog: dashboardCatalog() });
+  res.json({ ok: true, catalog: dashboardCatalog(req.actor) });
 });
 
 // Set the default routing mode (cheap | fast | balanced | quality).
+// Operators set the global default; users set their own, which wins
+// over the global one (but not over an X-Routing-Mode header).
 app.post("/config/routing", (req, res) => {
   const { mode } = req.body || {};
-  const updated = prefs.setRoutingMode(mode);
+  const updated =
+    req.actor?.role === "operator"
+      ? prefs.setRoutingMode(mode)
+      : userPrefs.setRoutingMode(req.actor.user.id, mode);
   if (updated === null) {
     return res.status(400).json({
       ok: false,
@@ -1021,7 +1434,7 @@ app.post("/config/routing", (req, res) => {
 // Switch the active classifier (auto | llm | jev). Applies live —
 // classify() reads the mode per request — and persists across
 // restarts via dashboard prefs.
-app.post("/config/classifier", (req, res) => {
+app.post("/config/classifier", requireOperator, (req, res) => {
   const { mode } = req.body || {};
   const updated = prefs.setClassifierMode(mode);
   if (updated === null) {
@@ -1034,19 +1447,96 @@ app.post("/config/classifier", (req, res) => {
   res.json({ ok: true, classifierMode: updated });
 });
 
+// ------------------------------------------------------------
+// API key management — consumed by the dashboard's API Keys page.
+// NOTE: once the first key exists, /v1/messages and /v1/classify
+// require a valid key (see requireApiKey above); these endpoints
+// are gated by attachActor (operator sees all keys, a signed-in
+// user only theirs) so keys can always be managed.
+// ------------------------------------------------------------
+
+/** The key list as the current actor should see it. */
+function keysForActor(actor) {
+  return actor.role === "operator"
+    ? apiKeys.listKeys()
+    : apiKeys.listKeysForUser(actor.user.id);
+}
+
+app.get("/config/api-keys", (req, res) => {
+  res.json({ keys: keysForActor(req.actor) });
+});
+
+app.post("/config/api-keys", (req, res) => {
+  // The key is attributed from the ACTOR, never from client input:
+  // a signed-in user always gets their own id (an unlinked key is
+  // rejected 402 key_not_linked once plan enforcement is on), and
+  // only an operator may attribute a key to another account.
+  const actor = req.actor;
+  const userId =
+    actor.role === "operator"
+      ? (typeof req.body?.userId === "string" ? req.body.userId : actor.user?.id ?? null)
+      : actor.user.id;
+  const created = apiKeys.createKey(req.body?.name, userId);
+  if (!created) {
+    return res.status(400).json({
+      ok: false,
+      error: "name must be a non-empty string (max 60 chars)",
+    });
+  }
+  // apiKey is the plaintext — returned exactly once, never stored.
+  res.json({ ok: true, key: created.entry, apiKey: created.secret });
+});
+
+app.delete("/config/api-keys/:id", (req, res) => {
+  const actor = req.actor;
+  // Ownership is part of the UPDATE for users, so another account's
+  // key behaves exactly like an unknown id: 404, key stays live.
+  const revoked =
+    actor.role === "operator"
+      ? apiKeys.revokeKey(req.params.id)
+      : apiKeys.revokeKeyForUser(req.params.id, actor.user.id);
+  if (!revoked) {
+    return res.status(404).json({
+      ok: false,
+      error: `Unknown key id "${req.params.id}"`,
+    });
+  }
+  res.json({ ok: true, keys: keysForActor(actor) });
+});
+
 // ============================================================
 // Start
 // ============================================================
 
 app.listen(PORT, () => {
   console.log(`\n🚀 LLM Proxy Server running on http://localhost:${PORT}`);
-  console.log(`   POST /v1/messages    — Anthropic-format API`);
-  console.log(`   POST /v1/classify    — Prompt classification (JSON only)`);
+  console.log(`   POST /v1/messages    — Anthropic-format API (API key required)`);
+  console.log(`   POST /v1/classify    — Prompt classification (API key required)`);
   console.log(`   GET  /               — Routing metrics dashboard`);
   console.log(`   GET  /metrics        — Metrics JSON`);
   console.log(`   GET  /config/dashboard — Model catalog + routing prefs`);
   console.log(`   POST /config/models  — Enable/disable a model`);
   console.log(`   POST /config/routing — Set default routing mode`);
+  console.log(`   GET  /config/api-keys  — List API keys`);
+  console.log(`   POST /config/api-keys  — Create an API key`);
+  console.log(`   DELETE /config/api-keys/:id — Revoke an API key`);
   console.log(`   POST /metrics/eval   — Run classifier eval set`);
-  console.log(`   GET  /health         — Server status\n`);
+  console.log(`   GET  /health         — Server status`);
+  console.log(
+    `   debug dump  : ${process.env.DEBUG_DUMP === "1" ? "ON (system.txt)" : "off"}`
+  );
+  console.log(
+    `   billing     : ${
+      process.env.PLAN_ENFORCEMENT === "1"
+        ? `ENFORCING prepaid balance (grace $${plans.GRACE_USD.toFixed(2)}, env=${plans.environment})`
+        : "off (PLAN_ENFORCEMENT unset)"
+    }`
+  );
+  console.log(
+    `   actor gate  : ${
+      process.env.ADMIN_TOKEN
+        ? "active (x-admin-token = operator, session = scoped user, else 401)"
+        : "off (no ADMIN_TOKEN set — every /config, /metrics caller is operator)"
+    }\n`
+  );
 });

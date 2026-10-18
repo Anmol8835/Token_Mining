@@ -15,6 +15,7 @@ import { DataTable, type Column } from "@/app/components/data-table";
 import { StatTile } from "@/app/components/stat-tile";
 import { Button, EmptyState, Panel, Segmented, Badge } from "@/app/components/ui";
 import { OverviewSkeleton } from "@/app/components/skeletons";
+import { AccountUsage } from "@/app/components/account-usage";
 
 const MODE_LABEL: Record<string, string> = {
   cheap: "Cost",
@@ -49,6 +50,9 @@ export default function Overview() {
 
   const { data: m, stale } = usePoll<MetricsSnapshot>("/api/server/metrics", 3000);
   const { data: cfg } = usePoll<DashboardConfig>("/api/server/config/dashboard", 10000);
+  // Demo/reset mutate the whole process — operator only (the backend
+  // 403s plain users; hiding the buttons keeps that out of the UI).
+  const isOperator = m?.viewer?.role === "operator";
 
   const records = useMemo(() => m?.allRecords ?? [], [m]);
   const timeBins = useMemo(() => bucketByTime(records, 24), [records]);
@@ -154,14 +158,22 @@ export default function Overview() {
             value={scope}
             onChange={setScope}
           />
-          <Button onClick={() => runAction("demo")} pending={busy === "demo"}>
-            Generate demo traffic
-          </Button>
-          <Button onClick={() => runAction("reset")} pending={busy === "reset"}>
-            Reset session
-          </Button>
+          {isOperator && (
+            <>
+              <Button onClick={() => runAction("demo")} pending={busy === "demo"}>
+                Generate demo traffic
+              </Button>
+              <Button onClick={() => runAction("reset")} pending={busy === "reset"}>
+                Reset session
+              </Button>
+            </>
+          )}
         </div>
       </div>
+
+      {/* Per-account durable totals (SQLite usage_daily) — separate
+          from the live session/all-time metrics below. */}
+      <AccountUsage />
 
       {!m ? (
         <OverviewSkeleton />
@@ -170,13 +182,27 @@ export default function Overview() {
       {hasTraffic === 0 && isAll ? (
         <EmptyState
           title="No all-time usage recorded yet"
-          body="Traffic through the router accumulates in data/usage-stats.json. Demo traffic stays session-only, so generate some real requests to see all-time numbers."
+          body={
+            isOperator
+              ? "Traffic through the router accumulates in data/usage-stats.json. Demo traffic stays session-only, so generate some real requests to see all-time numbers."
+              : "Your account's traffic accumulates here once you send real requests with one of your API keys."
+          }
         />
       ) : hasTraffic === 0 && (
         <EmptyState
           title="No traffic this session"
-          body="The dashboard reads live session metrics from the router. Generate a demo burst to see every panel populate without calling any provider."
-          action={<Button variant="primary" onClick={() => runAction("demo")}>Generate demo traffic</Button>}
+          body={
+            isOperator
+              ? "The dashboard reads live session metrics from the router. Generate a demo burst to see every panel populate without calling any provider."
+              : "The dashboard reads live session metrics from the router. Send a request with one of your API keys to see it here."
+          }
+          action={
+            isOperator ? (
+              <Button variant="primary" onClick={() => runAction("demo")}>
+                Generate demo traffic
+              </Button>
+            ) : undefined
+          }
         />
       )}
 

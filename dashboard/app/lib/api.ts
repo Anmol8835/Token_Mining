@@ -115,6 +115,13 @@ export type MetricsSnapshot = {
   eval: EvalSummary | null;
   recent: RecordRow[];
   allRecords: RecordRow[];
+  /**
+   * Who the backend resolved this snapshot for. "operator" = the
+   * global console (all accounts); "user" = scoped to the signed-in
+   * account. Operator-only actions (demo/reset/eval) are hidden from
+   * plain users.
+   */
+  viewer?: { role: "user" | "operator"; userId?: string | null };
 };
 
 export type ModelCatalogEntry = {
@@ -173,10 +180,49 @@ export type BenchmarkReport = {
 export type DashboardConfig = {
   models: ModelCatalogEntry[];
   prefs: { routingMode: string | null; disabledModels: string[] };
+  // Models the operator disabled globally; locked for user accounts.
+  // Optional: absent from older backends.
+  adminDisabledModels?: string[];
   routingModes: string[];
   classifier: { mode: string; modes: string[] };
   policy: { version?: number; generatedAt?: string; rules: unknown[] } | null;
   benchmark: BenchmarkReport | null;
+};
+
+export type ApiKeyEntry = {
+  id: string;
+  name: string;
+  prefix: string;
+  createdAt: string;
+  lastUsedAt: string | null;
+  lastUsedRoute: string | null;
+};
+
+export type ApiKeyList = { keys: ApiKeyEntry[] };
+
+/**
+ * Per-account durable totals from the dashboard's own /api/totals
+ * route (reads usage_daily in the shared SQLite file — written by
+ * the proxy's 30s persist tick).
+ */
+export type TotalsSnapshot = {
+  ok: true;
+  user: { id: string; email: string; name: string | null };
+  totals: {
+    requests: number;
+    inputTokens: number;
+    outputTokens: number;
+    cacheReadTokens: number;
+    cacheWriteTokens: number;
+    costUsd: number;
+    classifierCostUsd: number;
+    compactionCostUsd: number;
+    baselineCostUsd: number;
+    actualCostUsd: number;
+    savedUsd: number;
+    savedPct: number | null;
+  };
+  daily: { day: string; requests: number; costUsd: number; savedUsd: number }[];
 };
 
 export async function fetchJson<T>(path: string): Promise<T> {
@@ -198,7 +244,46 @@ export async function postJson<T>(path: string, body: unknown): Promise<T> {
   return json as T;
 }
 
+export async function deleteJson<T>(path: string): Promise<T> {
+  const res = await fetch(path, { method: "DELETE" });
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error((json as { error?: string }).error || `backend responded ${res.status}`);
+  }
+  return json as T;
+}
+
+export type AuthUser = { id: string; email: string; name: string | null };
+
+/** Shape of /api/billing/state (dashboard-local route). */
+export type BillingState = {
+  ok: true;
+  status: "active" | "pending" | "suspended";
+  balanceUsd: number;
+  graceUsd: number;
+  topups: { id: string; name: string; amountUsd: number; configured: boolean }[];
+  checkoutConfigured: boolean;
+  lastTopup: { amountUsd: number; at: number } | null;
+};
+
 export const getMetrics = () => fetchJson<MetricsSnapshot>("/api/server/metrics");
 export const getConfig = () => fetchJson<DashboardConfig>("/api/server/config/dashboard");
 export const getHealth = () =>
   fetchJson<{ status: string; models: { id: string }[] }>("/api/server/health");
+export const getApiKeys = () => fetchJson<ApiKeyList>("/api/server/config/api-keys");
+export const getTotals = () => fetchJson<TotalsSnapshot>("/api/totals");
+export const getBillingState = () => fetchJson<BillingState>("/api/billing/state");
+export const postCheckout = (topupId?: string) =>
+  postJson<{ ok: true; checkoutUrl: string; sessionId: string }>("/api/billing/checkout", {
+    topupId,
+  });
+export const getPortalUrl = () => fetchJson<{ ok: true; url: string }>("/api/billing/portal");
+export const getMe = () => fetchJson<{ ok: true; user: AuthUser }>("/api/auth/me");
+// The backend attributes the key to the signed-in session — no
+// userId is sent from the client (a client-supplied one is ignored
+// for non-operators; an unlinked key 402s key_not_linked once
+// PLAN_ENFORCEMENT is on).
+export const createApiKey = (name: string) =>
+  postJson<{ ok: true; key: ApiKeyEntry; apiKey: string }>("/api/server/config/api-keys", {
+    name,
+  });

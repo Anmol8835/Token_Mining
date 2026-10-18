@@ -1,0 +1,33 @@
+{
+  "updated": "2026-10-15",
+  "notes": "Prepaid top-ups (Dodo one-time products). amountUsd is USD dollars, used for display; the balance credit is the pre-tax amount Dodo reports on payment.succeeded (total_amount minus tax — sales tax is remitted, not credited). Dodo product prices are entered in cents. Product ids differ per Dodo environment (test_mode vs live_mode) — paste them from the Dodo dashboard. Enforcement blocks when users.balance_usd falls to -GRACE_USD (lib/plans.js GRACE_USD). Mirror: dashboard/lib/plans.json — keep the topups array in sync.",
+  "topups": [
+    {
+      "id": "t5",
+      "name": "$5 credit",
+      "amountUsd": 5,
+      "products": {
+        "test_mode": "pdt_0NpnSGHN8FBmBwT17k7DH",
+        "live_mode": "pdt_0NpnrieJNvTc6qltm9B4x"
+      }
+    },
+    {
+      "id": "t10",
+      "name": "$10 credit",
+      "amountUsd": 10,
+      "products": {
+        "test_mode": "pdt_0NpnSMyzVfGt5gWmZqvna",
+        "live_mode": "pdt_0NpnrlnXa6obi9iLFFQ7u"
+      }
+    },
+    {
+      "id": "t20",
+      "name": "$20 credit",
+      "amountUsd": 20,
+      "products": {
+        "test_mode": "pdt_0NpnSQSmsHhMJxpUNoIuU",
+        "live_mode": "pdt_0NpnroTxnAgAZiRVZcxqv"
+      }
+    }
+  ]
+}
